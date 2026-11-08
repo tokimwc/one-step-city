@@ -15,10 +15,13 @@
 <body>
   <main>
     <header><h1>One <span>Step</span> City</h1><p>One curb. Three journeys.</p></header>
+    <div class="phone-band" aria-hidden="true"><div><b>wheelchair</b><span></span><i></i></div><div><b>stroller</b><span></span><i></i></div><div><b>cart</b><span></span><i></i></div></div>
     <section class="city" aria-label="City crossing">
       <canvas id="city" width="1000" height="760" role="img" aria-label="Three people travel to the bakery, cafe, and shop. Lower the curb to shorten their routes.">Your browser needs Canvas 2D to show this city.</canvas>
 
     </section>
+    <p class="phone-guide">Start at the bottom, cross the street to the shops. The striped bar is the curb you control.</p>
+    <div class="phone-detail" aria-hidden="true"><div class="detail-wheel"></div><span>front wheel to scale</span><div class="detail-step"></div><strong></strong></div>
     <section class="control" aria-label="Curb control">
       <div class="control-heading"><div class="control-label"><label for="curb">Curb height</label><p id="hint"><span aria-hidden="true">←</span> Lower the curb</p></div><button id="reset" type="button">Reset</button><output id="height" for="curb" role="generic" aria-live="off">9 <small>cm</small></output></div>
       <div class="slider-wrap"><input id="curb" type="range" min="0" max="12" step="1" value="9" aria-describedby="hint limits explanation"><div class="scale" aria-hidden="true"><span>0 cm · level</span><span>12 cm · high</span></div><div class="threshold-ticks" aria-hidden="true"><span class="threshold-tick" data-value="2"></span><span class="threshold-tick" data-value="6"></span><span class="threshold-tick" data-value="8"></span></div></div>

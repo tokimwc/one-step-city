@@ -350,11 +350,78 @@ function desktopCurbDetail(x, y, width, height, now) {
   ctx.restore();
 }
 
+// A compact projection changes only drawing coordinates, never authored journeys.
+function phoneLayout() {
+  const scale=Math.min((viewWidth-44)/1000,(viewHeight-103)/332);
+  const left=(viewWidth-1000*scale)/2;
+  const buildingBottom=18+148*scale+5;
+  const roadTop=buildingBottom+16,roadHeight=127*scale;
+  const roadBottom=roadTop+roadHeight;
+  const home=roadBottom+16+7*scale;
+  const bell=home+50*scale+25;
+  const needed=bell+7+16;
+  const extra=Math.max(0,viewHeight-needed);
+  const top=18+extra/2;
+  const project=y=>y<=180?top+(y-20)*scale:y<210?top+160*scale+(y-180)/30*(roadTop+extra/2-top-160*scale):y<=337?roadTop+(y-210)*scale+extra/2:roadBottom+(y-337)/(580-337)*(home-roadBottom)+extra/2;
+  return {scale,left,top,roadTop:roadTop+extra/2,roadBottom:roadBottom+extra/2,home:home+extra/2,bell:bell+extra/2,project};
+}
+
+function drawPhone(now,elapsed) {
+  const ratio=canvas.width/viewWidth;
+  ctx.setTransform(ratio,0,0,ratio,0,0);box(0,0,viewWidth,viewHeight,CREAM);
+  const l=phoneLayout(),s=l.scale,x=v=>l.left+v*s,y=l.project;
+  sceneScale=1;
+  // Separate building, road, start and bell clusters have cream breathing space.
+  for(const person of people){
+    ctx.save();ctx.translate(l.left,l.top-20*s);ctx.scale(s,s);sceneScale=s;
+    building(person,journey(person,elapsed));ctx.restore();
+  }
+  sceneScale=1;
+  box(x(0),l.roadTop,1000*s,l.roadBottom-l.roadTop,INK);
+  for(let v=18;v<1000;v+=90)box(x(v),y(270),46*s,Math.max(1,5*s),YELLOW);
+  for(let v=217;v<332;v+=30)box(x(290),y(v),420*s,17*s,'#FFFFFF');
+  box(x(280),l.roadTop+2,2,l.roadBottom-l.roadTop-4,'#FFFFFF');
+  box(x(717),l.roadTop+2,2,l.roadBottom-l.roadTop-4,'#FFFFFF');
+  const step=Math.max(3,curb*2.2*s);
+  shape(x(280),l.roadBottom-step,440*s,step,ORANGE);
+  for(let v=286;v<710;v+=40)box(x(v),l.roadBottom-step,17*s,step,YELLOW);
+  const wedgeWidth=Math.min(12,1000*s*.15),depth=6;
+  for(const person of people)for(const edge of [l.roadTop,l.roadBottom]){
+    const xx=x(person.bypass);ctx.fillStyle=CREAM;ctx.strokeStyle=INK;ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(xx-wedgeWidth/2,edge);ctx.lineTo(xx+wedgeWidth/2,edge-depth/2);
+    ctx.lineTo(xx+wedgeWidth/2,edge+depth/2);ctx.lineTo(xx-wedgeWidth/2,edge+depth/2);ctx.closePath();ctx.fill();ctx.stroke();
+  }
+  for(const person of people){
+    const state=journey(person,elapsed),route=routeFor(person,curb).map(([a,b])=>[x(a),y(b)]);
+    if(previousCurb!==null){ctx.save();ctx.setLineDash([2,8]);ctx.globalAlpha=.55;line(routeFor(person,previousCurb).map(([a,b])=>[x(a-10),y(b)]),routeColor(person),2);ctx.restore();}
+    line(route,INK,4);line(route,routeColor(person),2);
+    circle(x(person.x),l.home,7*s,routeColor(person));
+    const [px,py]=state.point,bump=state.direct?crossingBump(elapsed):{lift:0,angle:0};
+    ctx.save();ctx.globalAlpha=motion.matches?1:Math.min(1,elapsed/150,(LOOP_MS-elapsed)/150);
+    ctx.translate(x(px)+(state.blocked&&!motion.matches?Math.sin(elapsed/35)*3:0),y(py)-bump.lift-walkingBob(state,elapsed));ctx.rotate(bump.angle);
+    const spriteScale=s*Math.max(1,28/(100*s));ctx.scale(spriteScale,spriteScale);sceneScale=spriteScale;if(px>910)ctx.scale(-1,1);character(person,0,0,state);
+    if(!state.direct&&!state.blocked&&elapsed>=APPROACH_MS+PAUSE_MS&&!state.arrived){line([[-20,-38],[-24,-46]],INK,2/sceneScale);line([[-30,-32],[-37,-36]],INK,2/sceneScale);}
+    ctx.restore();sceneScale=1;
+    if(state.blocked)bonk(x(px),y(py),elapsed);
+  }
+  // A small bell and its timing are the sole text in the phone canvas.
+  const bellX=viewWidth/2-24,bellY=l.bell;
+  ctx.strokeStyle=INK;ctx.lineWidth=2;ctx.fillStyle=YELLOW;
+  ctx.beginPath();ctx.arc(bellX,bellY-5,5,Math.PI,0);ctx.lineTo(bellX+7,bellY+2);ctx.lineTo(bellX-7,bellY+2);ctx.closePath();ctx.fill();ctx.stroke();circle(bellX,bellY+5,2,INK);
+  text('3.5 s',viewWidth/2+12,bellY+3,12.01);
+  ctx.save();ctx.beginPath();ctx.rect(16,16,viewWidth-32,viewHeight-32);ctx.clip();confetti(elapsed,viewWidth,viewHeight);ctx.restore();
+  document.querySelectorAll('.phone-band > div').forEach((e,i)=>{const p=people[i],state=journey(p,elapsed);e.style.color=routeColor(p);e.querySelector('span').textContent=state.direct?'straight':'2.5x longer';const mark=e.querySelector('i');const nextMark=state.arrived||elapsed>=DEADLINE_MS?(state.direct?'check':'clock'):'';if(mark.dataset.mark!==nextMark){mark.dataset.mark=nextMark;mark.innerHTML=nextMark?'<svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'+(nextMark==='check'?'<path d="M2 10l5 7L18 2"/>':'<circle cx="10" cy="10" r="8"/><path d="M10 4v6l5 3"/>')+'</svg>':'';}});
+  const detail=document.querySelector('.phone-detail');detail.querySelector('strong').textContent=curb+' cm';detail.querySelector('.detail-step').style.height=Math.max(3,curb*1.8)+'px';
+  const onTime = people.filter(person => curb <= person.threshold && journey(person, elapsed).arrived).length;
+  lesson.style.visibility = curb <= 2 && onTime === 3 ? 'visible' : 'hidden';
+}
+
 function draw(now) {
   // Initial dimensions are placeholders until resize measures the canvas.
   if (viewWidth <= 1 || viewHeight <= 1) return;
   const elapsed = ((now - startedAt) % LOOP_MS + LOOP_MS) % LOOP_MS;
   const phone = window.matchMedia('(max-width: 899px)').matches;
+  if(phone){drawPhone(now,elapsed);return;}
   const dprX = canvas.width / viewWidth, dprY = canvas.height / viewHeight;
   ctx.setTransform(dprX, 0, 0, dprY, 0, 0); ctx.globalAlpha = 1;
   box(0, 0, viewWidth, viewHeight, CREAM);
@@ -482,10 +549,19 @@ function restart(announce = false) {
 
 function resize() {
   // Measure wrapping HTML first; spend only the remaining viewport on the scene.
+  if(window.innerWidth<900){
+    canvas.style.height='200px';
+    const required=document.getElementById('result').getBoundingClientRect().bottom;
+    const available=window.innerHeight-required+200-4;
+    const width=canvas.getBoundingClientRect().width,s=Math.min((width-44)/1000,.6);
+    const minimum=18+148*s+5+16+127*s+16+7*s+50*s+25+7+16;
+    canvas.style.height=Math.max(minimum,Math.min(430,minimum+48,available))+'px';
+  } else {
   const current=canvas.getBoundingClientRect().height;
   const other=document.querySelector('main').getBoundingClientRect().height-current;
   const available=window.innerHeight-other-8;
   canvas.style.height=Math.max(260,Math.min(window.innerWidth<600?430:558,available))+'px';
+  }
   const bounds = canvas.getBoundingClientRect();
   viewWidth = bounds.width;
   viewHeight = bounds.height;

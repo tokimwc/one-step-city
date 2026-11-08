@@ -77,3 +77,34 @@ button:focus-visible,input:focus-visible { outline:3px solid #1764B1; outline-of
  header p { line-height:16px; }
  #explanation,#lesson,.scene-caption { line-height:14px; }
 }
+
+.phone-band,.phone-guide,.phone-detail { display:none; }
+
+@media(max-width:899px) {
+ header p { display:none; }
+ h1 { margin-bottom:0; }
+ header { margin-bottom:2px; }
+ .phone-band { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); padding:8px 0; }
+ .phone-band > div { position:relative; padding:0 8px; text-align:center; font-size:12px; line-height:16px; }
+ .phone-band b,.phone-band span { display:block; }
+ .phone-band span { line-height:20px; padding-right:20px; font-family:Arial,sans-serif; white-space:nowrap; }
+ .phone-band i { position:absolute; right:8px; bottom:0; font-style:normal; width:20px; height:20px; line-height:20px; min-width:20px; }
+ .city { box-shadow:none; }
+ .phone-guide { display:block; margin:0; font-size:13px; line-height:14px; color:#14183A; font-family:Arial,sans-serif; }
+ .phone-detail { display:flex; gap:8px; padding:12px; align-items:center; height:52px; }
+ .detail-wheel { flex:none; width:28px; height:28px; border:3px solid #14183A; border-radius:50%; background:linear-gradient(90deg,transparent 46%,#14183A 46% 54%,transparent 54%),#FFF4DC; }
+ .phone-detail span { font-size:12px; white-space:nowrap; }
+ .detail-step { flex:1; min-width:24px; border:2px solid #14183A; background:repeating-linear-gradient(90deg,#FF5A4E 0 8px,#FFD23F 8px 16px); }
+ .phone-detail strong { flex:none; font-size:24px; white-space:nowrap; }
+ .control { position:relative; margin-top:0; }
+ .control-heading { height:28px; }
+ #hint { display:none; }
+ #height { font-size:24px; line-height:28px; }
+ #reset { position:absolute; right:0; top:28px; }
+ .slider-wrap { margin:0 76px 0 0; }
+ .limit-chips { max-width:none; gap:2px 4px; margin:0; }
+ .limit-chip { padding:0 7px; }
+ #explanation,#lesson { min-height:0; }
+ .scene-caption { margin-top:8px; }
+}
+@media(max-width:899px) { main { width:min(1184px,calc(100% - 20px)); } }
