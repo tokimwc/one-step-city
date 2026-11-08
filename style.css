@@ -14,7 +14,7 @@ button { margin-left: auto; border: 2px solid #101820; padding: 7px 12px; backgr
 output { min-width: 82px; text-align: right; font-size: 28px; line-height: 32px; font-weight: 900; font-variant-numeric: tabular-nums; }
 output small { font-size: 14px; font-weight: 700; }
 .slider-wrap { position: relative; padding-top: 28px; }
-#hint { position: absolute; top: 3px; margin: 0; white-space: nowrap; font-size: 12px; line-height: 18px; font-weight: 700; outline: 1px solid transparent; animation: hint-pulse 2.4s ease-in-out infinite; }
+#hint { position: absolute; top: -1px; margin: 0; white-space: nowrap; font-size: 12px; line-height: 18px; font-weight: 700; outline: 1px solid transparent; animation: hint-pulse 2.4s ease-in-out infinite; }
 #hint.settled { animation: none; visibility: hidden; }
 #hint span { margin-right: 4px; }
 @keyframes hint-pulse { 50% { outline-color: #101820; outline-offset: 3px; } }
@@ -26,30 +26,40 @@ input[type=range]::-webkit-slider-thumb { appearance: none; -webkit-appearance: 
 input[type=range]::-moz-range-thumb { width: 28px; height: 28px; border: 2px solid #101820; border-radius: 0; background: #FF5A1F; }
 button:focus-visible, input:focus-visible { outline: 3px solid #101820; outline-offset: 4px; }
 .scale { display: flex; justify-content: space-between; font-size: 12px; line-height: 16px; }
-.threshold-ticks { position: relative; height: 22px; font-size: 12px; line-height: 16px; }
+.threshold-ticks { position: relative; height: 38px; font-size: 12px; line-height: 16px; }
 .threshold-tick { position: absolute; top: 4px; transform: translateX(-50%); white-space: nowrap; }
-.threshold-tick::before { content: ''; position: absolute; left: 50%; top: -42px; height: 7px; border-left: 1px solid #101820; }
+.threshold-tick span { display: block; text-align: center; }
+.threshold-tick::before { content: ''; position: absolute; left: 50%; transform: translateX(-50%); top: -42px; width: 4px; height: 7px; border: 1px solid currentColor; background: #FFFFFF; }
+.threshold-tick.found::before { background: currentColor; }
+.threshold-tick.found { animation: limit-found .6s ease-out; }
+@keyframes limit-found { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .threshold-tick.found { animation: none; } }
 #result { text-align: center; font-size: 24px; font-weight: 700; line-height: 32px; margin: 8px 0 0; }
-#thresholds { text-align: center; font-size: 12px; line-height: 18px; margin: 4px 0 0; }
+#discovery { text-align: center; font-size: 12px; line-height: 18px; margin: 0; min-height: 36px; }
 #lesson { text-align: center; font-size: 12px; line-height: 18px; margin: 4px 0 0; min-height: 36px; visibility: hidden; }
 .scene-caption { text-align: center; font-size: 12px; line-height: 18px; margin: 8px 0 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 @media (min-width: 601px) {
-  header { margin-bottom: 4px; }
-  .control { margin-top: 4px; }
-  .slider-wrap { padding-top: 12px; }
-  .threshold-ticks { height: 0; }
+  main { margin-top: 4px; margin-bottom: 4px; }
+  header { margin-bottom: 0; }
+  .control { margin-top: 0; }
+  .slider-wrap { padding-top: 26px; }
+  .threshold-ticks { height: 16px; }
   .threshold-tick { top: -16px; }
   .threshold-tick::before { top: -22px; }
-  #result { margin-top: 4px; }
-  .scene-caption { margin-top: 4px; }
+  #result, #lesson, .scene-caption { margin-top: 0; }
+  #discovery { min-height: 18px; }
+  .scene-caption br { display: none; }
+  .scene-caption br::after { content: " "; }
 }
 @media (max-width: 600px) {
-  main { margin-top: 12px; margin-bottom: 12px; }
+  main { margin-top: 4px; margin-bottom: 4px; }
+  header { margin-bottom: 4px; }
   h1 { font-size: 40px; margin-bottom: 4px; }
   canvas { height: 432px; }
-  .control { margin-top: 8px; }
-  .slider-wrap { padding-top: 18px; }
-  #result { font-size: 22px; }
-  #lesson { min-height: 36px; }
+  .control { margin-top: 4px; }
+  .slider-wrap { padding-top: 26px; }
+  #result { font-size: 22px; margin-top: 4px; }
+  #lesson { min-height: 36px; margin-top: 0; }
+  .scene-caption { margin-top: 0; }
 }

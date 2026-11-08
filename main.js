@@ -30,6 +30,28 @@ let startedAt = performance.now();
 let viewWidth = 1;
 let viewHeight = 1;
 let announcementTimer = null;
+const discoveries = people.map(() => ({ low: false, high: false, found: false }));
+const pendingLimits = new Set();
+
+function updateDiscovery() {
+  people.forEach((person, i) => {
+    const seen = discoveries[i];
+    if (curb <= person.threshold) seen.low = true;
+    else seen.high = true;
+    const tick = document.querySelectorAll('.threshold-tick')[i];
+    tick.style.color = routeColor(person);
+    if (!seen.found && seen.low && seen.high) {
+      seen.found = true;
+      pendingLimits.add(person.kind);
+      tick.classList.add('found');
+    }
+    tick.querySelector('.tick-limit').textContent = seen.found ? 'max ' + person.threshold + ' cm' : '?';
+  });
+  const count = discoveries.filter(seen => seen.found).length;
+  document.getElementById('discovery').textContent = count === 3
+    ? 'All three limits found. The lowest one decides who gets left behind.'
+    : "Find each person's limit: " + count + ' of 3 found';
+}
 
 // Both options are authored polylines. Each detour is 1,000 scene units;
 // each straight crossing is 400. This is an illustration, not route finding.
@@ -151,16 +173,20 @@ function character(person, x, y) {
     box(-12, -12, 24, 29, routeColor(person));
     circle(0, -21, 10, INK);
     if (person.kind === 'stroller') {
-      line([[8, 0], [22, -10], [28, 3]], INK, 4);
-      box(18, -28, 30, 30, '#FFFFFF');
-      line([[18, -28], [48, -28], [48, 2], [18, 2], [18, -28]], INK, 4);
-      line([[20, -10], [45, -10]], INK, 4);
-      circle(23, 5, 5, INK); circle(44, 5, 5, INK);
+      line([[8, 0], [18, -10], [24, -10]], INK, 5);
+      ctx.fillStyle = routeColor(person); ctx.strokeStyle = INK; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(38, -12, 20, Math.PI, 0); ctx.lineTo(18, -12); ctx.fill(); ctx.stroke();
+      box(19, -9, 38, 14, '#FFFFFF');
+      line([[18, -9], [23, 7], [52, 7], [58, -9]], INK, 4);
+      circle(25, 12, 6, INK); circle(50, 12, 6, INK);
     } else {
-      line([[9, 1], [25, -7], [29, 20], [49, 20]], INK, 4);
-      box(24, -10, 27, 24, INK);
-      line([[37, -10], [37, 14]], '#FFFFFF', 3);
-      circle(29, 24, 5, INK); circle(49, 24, 5, INK);
+      line([[8, 0], [20, -4], [20, -42], [25, -42]], INK, 5);
+      box(26, -37, 25, 25, INK);
+      box(26, -8, 25, 25, INK);
+      line([[38, -34], [38, -15]], '#FFFFFF', 3);
+      line([[38, -5], [38, 14]], '#FFFFFF', 3);
+      line([[20, -4], [20, 21], [55, 21]], INK, 5);
+      circle(24, 26, 6, INK); circle(49, 26, 6, INK);
     }
   }
   ctx.restore();
@@ -182,9 +208,10 @@ function labelBand(width, elapsed) {
   people.forEach((person, i) => {
     const left = i * width / 3, center = left + width / 6 - 9;
     const state = journey(person, elapsed);
-    text(person.destination, center, 15, 12);
-    text((state.arrived ? 1 : 0) + ' visitor', center, 33, 12);
-    text(state.direct ? 'straight' : '2.5x longer', center, 51, 12);
+    text(person.destination, center, 12, 12);
+    text(person.kind, center, 25, 12, routeColor(person));
+    text((state.arrived ? 1 : 0) + ' visitor', center, 39, 12);
+    text(state.direct ? 'straight' : '2.5x longer', center, 53, 12);
     if (state.arrived || elapsed >= DEADLINE_MS) statusIcon(left + width / 3 - 14, 22, state.direct);
   });
   line([[0, 60], [width, 60]], INK, 2);
@@ -264,7 +291,9 @@ function desktopCurbDetail(x, y, width, height, now) {
     line([[0, 0], [Math.cos(angle) * (radius - 5), Math.sin(angle) * (radius - 5)]], INK, 2);
   }
   circle(0, 0, 5, INK);
-  ctx.restore(); ctx.restore();
+  ctx.restore();
+  text('front wheel, same scale', 16 + radius, floor + 24, 12);
+  ctx.restore();
 }
 
 function draw(now) {
@@ -333,6 +362,14 @@ function draw(now) {
       text('BLOCKED', x, person.kind === 'stroller' ? 490 : 435, 15);
     }
   }
+  // Authored crossings: markers explain the fixed bypasses without changing routes.
+  for (const person of people) {
+    const x = person.bypass;
+    ctx.save(); ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = ORANGE;
+    ctx.lineWidth = 2 / mapScale;
+    ctx.beginPath(); ctx.moveTo(x - 15, 346); ctx.lineTo(x + 15, 326);
+    ctx.lineTo(x + 15, 346); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+  }
   ctx.restore(); sceneScale = 1;
   labelBand(mapWidth, elapsed);
   curbDetail(phone ? 0 : mapWidth + 24, phone ? 328 : 0,
@@ -357,7 +394,9 @@ function updateAccessibility(announce) {
   if (announce) {
     clearTimeout(announcementTimer);
     announcementTimer = setTimeout(() => {
-      document.getElementById('announcement').textContent = summary;
+      const found = [...pendingLimits].map(name => 'Limit found: ' + name + '.').join(' ');
+      document.getElementById('announcement').textContent = summary + (found ? ' ' + found : '');
+      pendingLimits.clear();
       announcementTimer = null;
     }, 400);
   }
@@ -365,9 +404,8 @@ function updateAccessibility(announce) {
 
 function positionHint() {
   const width = slider.getBoundingClientRect().width;
-  const thumb = 16 + (width - 32) * curb / 12;
   const hint = document.getElementById('hint');
-  hint.style.left = Math.max(0, Math.min(width - hint.offsetWidth, thumb - hint.offsetWidth)) + 'px';
+  hint.style.left = '0px';
   document.querySelectorAll('.threshold-tick').forEach(tick => {
     tick.style.left = (16 + (width - 32) * Number(tick.dataset.value) / 12) + 'px';
   });
@@ -380,6 +418,7 @@ function restart(announce = false) {
   heightOutput.innerHTML = `${curb} <small>cm</small>`;
   slider.setAttribute('aria-valuetext', `${curb} centimeters`);
   positionHint();
+  updateDiscovery();
   updateAccessibility(announce);
   startedAt = performance.now();
   draw(startedAt);
@@ -406,7 +445,12 @@ slider.addEventListener('input', () => {
   document.getElementById('hint').classList.add('settled');
   restart(true);
 });
-document.getElementById('reset').addEventListener('click', () => { slider.value = '9'; restart(true); });
+document.getElementById('reset').addEventListener('click', () => {
+  discoveries.forEach(seen => { seen.low = false; seen.high = false; seen.found = false; });
+  pendingLimits.clear();
+  document.querySelectorAll('.threshold-tick').forEach(tick => tick.classList.remove('found'));
+  slider.value = '9'; restart(true);
+});
 window.addEventListener('resize', resize);
 motion.addEventListener('change', () => draw(performance.now()));
 restart();
