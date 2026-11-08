@@ -225,31 +225,33 @@ function arrow(from, to) {
   line([[to[0]-6*Math.cos(a-.5),to[1]-6*Math.sin(a-.5)],to,[to[0]-6*Math.cos(a+.5),to[1]-6*Math.sin(a+.5)]],INK,2);
 }
 
-// Fixed labels stay outside the complete traveler corridors at every curb height.
+function sceneLabelLayout(mapX,mapY,scale,phone) {
+  const p=(x,y)=>[mapX+x*scale,mapY+y*scale];
+  const compact=phone && viewHeight-Math.min(104,Math.max(62,viewHeight*.23))<235;
+  const rampY=compact?86:Math.max(86,p(100,100)[1]);
+  const crossingY=compact?111:Math.max(rampY+25,p(280,225)[1]);
+  const streetY=compact?136:Math.max(crossingY+25,p(0,275)[1]);
+  const curbTop=compact?150:Math.max(streetY+13,p(280,400)[1]);
+  const homeY=compact?86:Math.max(curbTop+55,p(340,580)[1]);
+  return {compact,rampY,crossingY,streetY,curbTop,homeY};
+}
+
+// Labels occupy a dedicated sidewalk lane outside every authored route.
 function sceneTags(mapX,mapY,scale,width,phone,elapsed) {
   const p=(x,y)=>[mapX+x*scale,mapY+y*scale];
-  const [left,roadTop]=p(280,210), roadBottom=p(280,337)[1];
-  if(phone) {
-    ctx.save();ctx.translate(mapX+47,(roadTop+roadBottom)/2);ctx.rotate(-Math.PI/2);
-    tag('STREET',0,0,YELLOW);ctx.restore();
-    tag('CROSSWALK',mapX+49,roadBottom+30);
-    line([[left-4,roadBottom+26],[left-4,roadBottom-4]],INK,2);
-  } else {
-    tag('STREET',...p(150,275),YELLOW);
-    tag('CROSSWALK',...p(190,225));
-    line([[p(190,225)[0]+49,p(190,225)[1]-3],[left-2,p(190,225)[1]-3]],INK,2);
-  }
-  const cx=phone?mapX+49:p(190,425)[0];
-  const top=phone?roadBottom+52:roadBottom+66;
-  shape(cx-49,top,98,36,YELLOW,false,4);
-  text('CURB',cx,top+14,12.01);
-  text('you control this',cx,top+30,12.01);
-  line([[cx+47,top],[left,roadBottom+3]],INK,2);
-  tag('HOME',...p(190,phone?650:580),MINT);
-  const [rx,ry]=p(people[0].bypass,210);
-  const gap=phone?19:32;
-  tag('ramp',rx+gap+21,ry-36);
-  line([[rx+15,ry-18],[rx+gap,ry-18]],INK,2);
+  const {compact,rampY,crossingY,streetY,curbTop,homeY}=sceneLabelLayout(mapX,mapY,scale,phone);
+  // An unmarked extension of the road carries its name, away from crossings.
+  tag('ramp',compact?26:52,rampY);
+  line([[74,rampY],p(people[0].bypass,210)],INK,2);
+  tag('CROSSWALK',52,crossingY);
+  line([[102,crossingY],p(280,275)],INK,2);
+  tag('STREET',52,streetY,YELLOW);
+  shape(3,curbTop,98,36,YELLOW,false,4);
+  text('CURB',52,curbTop+14,12.01);
+  text('you control this',52,curbTop+30,12.01);
+  line([[101,curbTop+5],p(280,337)],INK,2);
+  tag('HOME',compact?78:52,homeY,MINT);
+  line([[76,homeY],p(340,580)],INK,2);
 }
 
 // Render-only feedback: the authored route point and arrival clock stay untouched.
@@ -283,18 +285,19 @@ function curbDetail(x,y,width,height,phone,now) {
   if(!phone){desktopCurbDetail(x,y,width,height,now);return;}
   ctx.save();ctx.translate(x,y);sceneScale=1;
   box(0,0,width,height,SKY);line([[0,0],[width,0]],INK,3);
-  text('Curb detail · enlarged',width/2,17,12.01);
-  const floor=height-20,step=curb*4,edge=65,right=width-116;
+  text('Curb detail · enlarged',width/2-24,15,12.01);
+  const pxPerCm=Math.min(4,(height-38)/12), radius=5*pxPerCm;
+  const floor=height-19,step=curb*pxPerCm,edge=65,right=width-116;
   shape(edge,floor-Math.max(3,step),right-edge,Math.max(3,step),ORANGE);
   for(let sx=edge+5;sx<right-5;sx+=25)box(sx,floor-Math.max(3,step),10,Math.max(3,step),YELLOW);
   line([[edge,floor-step],[right,floor-step]],INK,3);
   line([[8,floor],[right,floor]],INK,3);
   const elapsed=((now-startedAt)%LOOP_MS+LOOP_MS)%LOOP_MS;
   const hop=people.some(p=>curb<=p.threshold)?crossingBump(elapsed).lift:0;
-  circle(29,floor-20-hop,20,CREAM);ctx.strokeStyle=INK;ctx.lineWidth=3;ctx.beginPath();ctx.arc(29,floor-20-hop,20,0,Math.PI*2);ctx.stroke();
-  line([[12,floor-20-hop],[46,floor-20-hop]],INK,2);circle(29,floor-20-hop,4,YELLOW);
+  circle(29,floor-radius-hop,radius,CREAM);ctx.strokeStyle=INK;ctx.lineWidth=3;ctx.beginPath();ctx.arc(29,floor-radius-hop,radius,0,Math.PI*2);ctx.stroke();
+  line([[12,floor-radius-hop],[46,floor-radius-hop]],INK,2);circle(29,floor-radius-hop,4,YELLOW);
   text('front wheel, same scale',85,height-5,12.01);
-  text(curb+' cm',width-56,floor-13,36);
+  text(curb+' cm',width-56,floor-13,height<90?26:36);
   ctx.restore();
 }
 
@@ -304,7 +307,7 @@ function desktopCurbDetail(x, y, width, height, now) {
   text('Curb detail · enlarged', width / 2, 25, 14);
   // At the target desktop size: 22 px/cm, 264 px at 12 cm,
   // and a 110 px radius wheel representing 5 cm at the same scale.
-  const pxPerCm = Math.min(22, (width - 38) / 15, (height - 108) / 14);
+  const pxPerCm = Math.min(22, (width - 140) / 10, (height - 150) / 14);
   const radius = 5 * pxPerCm;
   const step = curb * pxPerCm;
   const groupHeight = Math.max(2 * radius, step + 58);
@@ -351,15 +354,20 @@ function draw(now) {
   // Initial dimensions are placeholders until resize measures the canvas.
   if (viewWidth <= 1 || viewHeight <= 1) return;
   const elapsed = ((now - startedAt) % LOOP_MS + LOOP_MS) % LOOP_MS;
-  const phone = window.matchMedia('(max-width: 600px)').matches;
+  const phone = window.matchMedia('(max-width: 899px)').matches;
   const dprX = canvas.width / viewWidth, dprY = canvas.height / viewHeight;
   ctx.setTransform(dprX, 0, 0, dprY, 0, 0); ctx.globalAlpha = 1;
   box(0, 0, viewWidth, viewHeight, CREAM);
-  const mapWidth = phone ? viewWidth : viewWidth - 392;
-  const mapHeight = phone ? 258 : viewHeight - 62;
-  const mapScale = Math.min((mapWidth - 12) / 1000, mapHeight / 660);
-  const mapX = (mapWidth - 1000 * mapScale) / 2;
-  const mapY = 62 + (mapHeight - 660 * mapScale) / 2 + 8 * mapScale;
+  const detailWidth = Math.min(368,viewWidth*.3);
+  const mapWidth = phone ? viewWidth : viewWidth-detailWidth-24;
+  const detailHeight = phone ? Math.min(104,Math.max(62,viewHeight*.23)) : viewHeight;
+  const detailY = phone ? viewHeight-detailHeight : 0;
+  const mapHeight = (phone?detailY:viewHeight)-77;
+  const mapScale = Math.min((mapWidth-142)/1000,mapHeight/720);
+  const mapX = 116+(mapWidth-142-1000*mapScale)/2;
+  const mapY = 77+(mapHeight-720*mapScale)/2;
+  const {streetY}=sceneLabelLayout(mapX,mapY,mapScale,phone);
+  box(0,streetY-16,mapX+1,25,INK);
   ctx.save(); ctx.translate(mapX, mapY); ctx.scale(mapScale, mapScale);
   sceneScale = mapScale;
   box(0,0,1000,214,SKY);
@@ -416,9 +424,9 @@ function draw(now) {
   ctx.restore(); sceneScale = 1;
   sceneTags(mapX,mapY,mapScale,mapWidth,phone,elapsed);
   labelBand(mapWidth, elapsed);
-  confetti(elapsed,mapWidth,phone?326:viewHeight);
-  curbDetail(phone ? 0 : mapWidth + 24, phone ? 326 : 0,
-    phone ? viewWidth : 368, phone ? 104 : viewHeight, phone, now);
+  confetti(elapsed,mapWidth,phone?detailY:viewHeight);
+  curbDetail(phone ? 0 : mapWidth + 24, detailY,
+    phone ? viewWidth : detailWidth, detailHeight, phone, now);
   if (!phone) {
     line([[0, 69], [viewWidth, 69]], INK, 2);
     line([[mapWidth + 12, 0], [mapWidth + 12, viewHeight]], INK, 2);
@@ -451,7 +459,7 @@ function positionHint() {
   const hint = document.getElementById('hint');
   hint.style.left = '0px';
   document.querySelectorAll('.threshold-tick').forEach(tick => {
-    tick.style.left = (20 + (width - 40) * Number(tick.dataset.value) / 12) + 'px';
+    tick.style.left = (22 + (width - 44) * Number(tick.dataset.value) / 12) + 'px';
   });
 }
 
@@ -473,6 +481,11 @@ function restart(announce = false) {
 }
 
 function resize() {
+  // Measure wrapping HTML first; spend only the remaining viewport on the scene.
+  const current=canvas.getBoundingClientRect().height;
+  const other=document.querySelector('main').getBoundingClientRect().height-current;
+  const available=window.innerHeight-other-8;
+  canvas.style.height=Math.max(260,Math.min(window.innerWidth<600?430:558,available))+'px';
   const bounds = canvas.getBoundingClientRect();
   viewWidth = bounds.width;
   viewHeight = bounds.height;
