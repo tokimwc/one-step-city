@@ -26,7 +26,6 @@ let curb = Number(slider.value);
 let previousCurb = null;
 let hasMovedSlider = false;
 let sceneScale = 1;
-let lastResult = '';
 let startedAt = performance.now();
 let viewWidth = 1;
 let viewHeight = 1;
@@ -167,6 +166,17 @@ function character(person, x, y) {
   ctx.restore();
 }
 
+// Render-only feedback: the authored route point and arrival clock stay untouched.
+function crossingBump(elapsed) {
+  if (motion.matches || curb === 0) return { lift: 0, angle: 0 };
+  const crossingAt = (580 - 337) / 400 * DIRECT_MS;
+  const phase = (elapsed - crossingAt) / 400;
+  if (phase <= 0 || phase >= 1) return { lift: 0, angle: 0 };
+  const envelope = Math.sin(Math.PI * phase) ** 2;
+  return { lift: 10 * curb / 8 * envelope,
+    angle: .09 * curb / 8 * Math.sin(phase * Math.PI * 2) * envelope };
+}
+
 function labelBand(width, elapsed) {
   sceneScale = 1;
   people.forEach((person, i) => {
@@ -174,9 +184,10 @@ function labelBand(width, elapsed) {
     const state = journey(person, elapsed);
     text(person.destination, center, 15, 12);
     text((state.arrived ? 1 : 0) + ' visitor', center, 33, 12);
+    text(state.direct ? 'straight' : '2.5x longer', center, 51, 12);
     if (state.arrived || elapsed >= DEADLINE_MS) statusIcon(left + width / 3 - 14, 22, state.direct);
   });
-  line([[0, 42], [width, 42]], INK, 2);
+  line([[0, 60], [width, 60]], INK, 2);
 }
 
 function curbDetail(x, y, width, height, phone, now) {
@@ -198,6 +209,10 @@ function curbDetail(x, y, width, height, phone, now) {
     line([[edge, floor - step], [edge, floor - step - 5], [right, floor - step - 5]], INK, 2);
   }
   line([[12, floor], [right, floor]], INK, 2);
+  // A small crossing marker gives the phone detail the same hop as the sprites.
+  const elapsed = ((now - startedAt) % LOOP_MS + LOOP_MS) % LOOP_MS;
+  const hop = people.some(person => curb <= person.threshold) ? crossingBump(elapsed).lift : 0;
+  circle(edge - 18, floor - 5 - hop, 5, INK);
   if (!hasMovedSlider && !motion.matches) {
     ctx.save(); ctx.globalAlpha = .35 + .4 * (1 + Math.sin(now / 380)) / 2;
     ctx.strokeStyle = INK; ctx.lineWidth = 1;
@@ -238,7 +253,9 @@ function desktopCurbDetail(x, y, width, height, now) {
     ctx.restore();
   }
   const roll = motion.matches ? 0 : Math.min(8, ((now - startedAt + LOOP_MS) % LOOP_MS) / 160);
-  ctx.save(); ctx.translate(16 + radius - 8 + roll, floor - radius);
+  const elapsed = ((now - startedAt) % LOOP_MS + LOOP_MS) % LOOP_MS;
+  const hop = people.some(person => curb <= person.threshold) ? crossingBump(elapsed).lift : 0;
+  ctx.save(); ctx.translate(16 + radius - 8 + roll, floor - radius - hop);
   ctx.rotate(roll / radius);
   ctx.strokeStyle = INK; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.stroke();
@@ -259,11 +276,11 @@ function draw(now) {
   ctx.setTransform(dprX, 0, 0, dprY, 0, 0); ctx.globalAlpha = 1;
   box(0, 0, viewWidth, viewHeight, '#FFFFFF');
   const mapWidth = phone ? viewWidth : viewWidth - 392;
-  const mapHeight = phone ? 276 : viewHeight - 44;
+  const mapHeight = phone ? 258 : viewHeight - 62;
   const mapScale = Math.min(mapWidth / 1000, mapHeight / (phone ? 760 : 666));
   const mapX = (mapWidth - 1000 * mapScale) / 2;
-  const mapY = phone ? 44 + (mapHeight - 760 * mapScale) / 2
-    : 44 + (mapHeight - 666 * mapScale) / 2 - 38 * mapScale;
+  const mapY = phone ? 62 + (mapHeight - 760 * mapScale) / 2
+    : 62 + (mapHeight - 666 * mapScale) / 2 - 38 * mapScale;
   ctx.save(); ctx.translate(mapX, mapY); ctx.scale(mapScale, mapScale);
   sceneScale = mapScale;
   box(0, 284, 1000, 125, INK);
@@ -298,7 +315,17 @@ function draw(now) {
     circle(person.x, 580, 7, routeColor(person));
     const [x, y] = state.point;
     ctx.save(); ctx.globalAlpha = fade;
-    character(person, x + (state.blocked && !motion.matches ? Math.sin(elapsed / 35) * 3 : 0), y);
+    const bump = state.direct ? crossingBump(elapsed) : { lift: 0, angle: 0 };
+    ctx.translate(x + (state.blocked && !motion.matches ? Math.sin(elapsed / 35) * 3 : 0),
+      y - bump.lift / mapScale);
+    ctx.rotate(bump.angle);
+    if (x > 910) ctx.scale(-1, 1);
+    character(person, 0, 0);
+    if (!state.direct && !state.blocked && elapsed >= APPROACH_MS + PAUSE_MS && !state.arrived) {
+      // Static ink sweat marks: also readable with reduced motion enabled.
+      line([[-20, -38], [-24, -46]], INK, 2 / mapScale);
+      line([[-30, -32], [-37, -36]], INK, 2 / mapScale);
+    }
     ctx.restore();
     if (state.blocked) {
       line([[x + 32, y - 40], [x + 44, y - 28]], INK, 4);
@@ -311,21 +338,21 @@ function draw(now) {
   curbDetail(phone ? 0 : mapWidth + 24, phone ? 328 : 0,
     phone ? viewWidth : 368, phone ? 104 : viewHeight, phone, now);
   if (!phone) {
-    line([[0, 42], [viewWidth, 42]], INK, 2);
+    line([[0, 60], [viewWidth, 60]], INK, 2);
     line([[mapWidth + 12, 0], [mapWidth + 12, viewHeight]], INK, 2);
   }
   const onTime = people.filter(person => curb <= person.threshold && journey(person, elapsed).arrived).length;
-  const message = `${onTime} of 3 arrived on time`;
-  if (message !== lastResult) { result.textContent = message; lastResult = message; }
   lesson.style.visibility = curb <= 2 && onTime === 3 ? 'visible' : 'hidden';
 }
 
 function updateAccessibility(announce) {
   const names = ['Wheelchair user', 'Stroller user', 'Cart user'];
-  const finalCount = people.filter(person => curb <= person.threshold).length;
+  const finalOnTime = people.filter(person => curb <= person.threshold).length;
+  const message = `${finalOnTime} of 3 arrive on time`;
+  result.textContent = message;
   const outcomes = people.map((person, i) => names[i] + ' to ' + person.destination.toLowerCase() +
     (curb <= person.threshold ? ': direct crossing, arrives on time.' : ': blocked at the curb, takes a detour and arrives late.')).join(' ');
-  const summary = 'Curb ' + curb + ' cm: ' + finalCount + ' of 3 on time. ' + outcomes;
+  const summary = 'Curb ' + curb + ' cm: ' + message + '. ' + outcomes;
   canvas.setAttribute('aria-label', 'Top-down city and enlarged curb cross-section. ' + summary);
   if (announce) {
     clearTimeout(announcementTimer);
@@ -341,6 +368,9 @@ function positionHint() {
   const thumb = 16 + (width - 32) * curb / 12;
   const hint = document.getElementById('hint');
   hint.style.left = Math.max(0, Math.min(width - hint.offsetWidth, thumb - hint.offsetWidth)) + 'px';
+  document.querySelectorAll('.threshold-tick').forEach(tick => {
+    tick.style.left = (16 + (width - 32) * Number(tick.dataset.value) / 12) + 'px';
+  });
 }
 
 function restart(announce = false) {

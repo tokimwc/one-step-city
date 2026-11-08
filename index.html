@@ -22,8 +22,10 @@
     <section class="control" aria-label="Curb control">
       <div class="control-heading"><label for="curb">Curb height</label><button id="reset" type="button">Reset</button><output id="height" for="curb" role="generic" aria-live="off">9 <small>cm</small></output></div>
       <div class="slider-wrap"><p id="hint"><span aria-hidden="true">←</span> Lower the curb</p><input id="curb" type="range" min="0" max="12" step="1" value="9" aria-describedby="hint"><div class="scale" aria-hidden="true"><span>0 cm · level</span><span>12 cm · high</span></div></div>
-      <p id="result">0 of 3 arrived on time</p>
-      <p id="lesson">Lower it for the person who needs it most, and everyone gets through.</p>
+      <div class="threshold-ticks" aria-hidden="true"><span class="threshold-tick" data-value="2">wheelchair 2</span><span class="threshold-tick" data-value="6">stroller 6</span><span class="threshold-tick" data-value="8">cart 8</span></div>
+      <p id="result">0 of 3 arrive on time</p>
+      <p id="thresholds">Wheelchair user blocked above 2 cm. Stroller above 6 cm. Cart above 8 cm.</p>
+      <p id="lesson">Lower it for the person who needs it most, and everyone gets through. Lowering one curb for the person who needs it most helps everyone.</p>
     </section>
     <p class="scene-caption">Routes are authored, not a real accessibility simulation.</p>
     <p id="announcement" class="sr-only" role="status" aria-atomic="true"></p>
