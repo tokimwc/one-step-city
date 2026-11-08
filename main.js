@@ -24,6 +24,8 @@ const people = [
 ];
 let curb = Number(slider.value);
 let previousCurb = null;
+let hasMovedSlider = false;
+let sceneScale = 1;
 let lastResult = '';
 let startedAt = performance.now();
 let viewWidth = 1;
@@ -100,7 +102,7 @@ function circle(x, y, r, color) {
 }
 
 function text(label, x, y, size, color = '#42594b') {
-  ctx.font = `600 ${size}px system-ui, sans-serif`;
+  ctx.font = `600 ${Math.max(size, 12 / sceneScale)}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.fillStyle = color;
   ctx.fillText(label, x, y);
@@ -127,8 +129,7 @@ function building(person, state, elapsed) {
   ctx.restore();
   box(x - 12, 122, 24, 50, '#6c7c6d', 3);
   text(person.destination, x, 37, 23);
-  box(x - 40, 220, 80, 25, '#dce3d1', 4);
-  text(`${state.arrived ? 1 : 0} visitor`, x, 238, 17);
+  text(`${state.arrived ? 1 : 0} visitor`, x, 261, 17);
   if (state.arrived || elapsed >= DEADLINE_MS) statusIcon(x + 58, 157, state.direct);
 }
 
@@ -175,6 +176,7 @@ function draw(now) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
   box(0, 0, canvas.width, canvas.height, '#e9edde');
+  sceneScale = Math.min(viewWidth / 1000, viewHeight / 760);
   const scale = Math.min(canvas.width / 1000, canvas.height / 760);
   ctx.setTransform(scale, 0, 0, scale, (canvas.width - 1000 * scale) / 2, (canvas.height - 760 * scale) / 2);
   box(0, 0, 1000, 760, '#e9edde');
@@ -185,9 +187,24 @@ function draw(now) {
   box(80, 306, 700, 62, '#e0e5d9');
   for (let x = 290; x < 710; x += 41) box(x, 296, 22, 85, '#f4f2df');
   // The two ends are open, giving the authored detours a place to cross.
-  box(80, 331, 700, 6 + curb * 1.1, '#8b8d7a', 3);
-  box(80, 328, 700, 5, '#f4f2df', 2);
-  text(`${curb} cm`, 140, 309, 23, '#596759');
+  // Raise the top face while keeping the authored crossing in place.
+  const stepHeight = curb * 2.2;
+  const stepTop = 337 - stepHeight;
+  ctx.save();
+  ctx.shadowColor = '#344b4d40'; ctx.shadowBlur = curb ? 10 : 0;
+  ctx.shadowOffsetY = curb ? 5 : 0;
+  box(80, stepTop, 700, stepHeight + 3, '#7d806d', 2);
+  ctx.restore();
+  box(80, stepTop - 7, 700, 8, '#faf6dd', 2);
+  line([[82, stepTop + 2], [778, stepTop + 2]], '#aaab91', 2);
+  if (!hasMovedSlider && !motion.matches) {
+    ctx.save();
+    ctx.globalAlpha = .35 + .4 * (1 + Math.sin(now / 380)) / 2;
+    ctx.strokeStyle = '#a56832'; ctx.lineWidth = 1.5 / sceneScale;
+    ctx.beginPath(); ctx.roundRect(74, stepTop - 13, 712, stepHeight + 23, 6); ctx.stroke();
+    ctx.restore();
+  }
+  text(`${curb} cm`, 140, stepTop - 25, 23, '#596759');
   tree(155, 143); tree(845, 130); tree(170, 660); tree(840, 660);
   box(450, 670, 100, 13, '#b69e75', 3);
   box(460, 684, 7, 14, '#7b806a', 2); box(533, 684, 7, 14, '#7b806a', 2);
@@ -219,7 +236,8 @@ function draw(now) {
     if (state.blocked) {
       line([[x + 32, y - 40], [x + 44, y - 28]], '#794b36', 4);
       line([[x + 44, y - 40], [x + 32, y - 28]], '#794b36', 4);
-      text('BLOCKED', x, y + 56, 15, '#794b36');
+      // Stagger the middle label to leave room for the larger phone text.
+      text('BLOCKED', x, person.kind === 'stroller' ? 490 : 435, 15, '#794b36');
     }
   }
   const onTime = people.filter(person => curb <= person.threshold && journey(person, elapsed).arrived).length;
@@ -253,7 +271,11 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-slider.addEventListener('input', restart);
+slider.addEventListener('input', () => {
+  hasMovedSlider = true;
+  document.getElementById('hint').classList.add('settled');
+  restart();
+});
 document.getElementById('reset').addEventListener('click', () => { slider.value = '9'; restart(); });
 window.addEventListener('resize', resize);
 motion.addEventListener('change', () => draw(performance.now()));

@@ -8,7 +8,7 @@ h1 { font-size: clamp(36px, 5vw, 57px); line-height: 1.1; letter-spacing: -.055e
 h1 span { color: #c07142; }
 header p { margin: 0; font-size: 14px; color: #63716a; }
 .city { border: 1px solid #d8ddcf; border-radius: 18px; background: #e9edde; overflow: hidden; }
-canvas { display: block; width: 100%; height: min(48vh, 460px); min-height: 300px; }
+canvas { display: block; width: 100%; height: min(62vh, 560px); min-height: 300px; }
 .scene-caption { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 20px; background: #f0f1e7; border-top: 1px solid #d8ddcf; font-size: 10px; color: #68736a; }
 .scene-caption > span:first-child { white-space: nowrap; font-size: 9px; letter-spacing: .12em; font-weight: 700; }
 i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #4a7766; margin-right: 5px; }
@@ -31,6 +31,22 @@ input:focus-visible { outline: 2px solid #b26e39; outline-offset: 3px; border-ra
 #hint { text-align: center; font-size: 13px; font-weight: 650; margin: 12px 0 0; }
 #hint span { margin-right: 5px; }
 footer { text-align: center; font-size: 9px; letter-spacing: .16em; color: #7a8276; margin-top: 12px; }
+#hint { border-radius: 6px; outline: 1px solid transparent; animation: hint-pulse 2.4s ease-in-out infinite; }
+#hint.settled { animation: none; }
+@keyframes hint-pulse { 50% { outline-color: #a56832; outline-offset: 4px; } }
+@media (prefers-reduced-motion: reduce) { #hint { animation: none; } }
+@media (min-width: 601px) {
+  main { padding-top: 10px; padding-bottom: 6px; }
+  header { margin-bottom: 8px; }
+  h1 { font-size: 42px; margin: 2px 0; }
+  .scene-caption { padding: 8px 20px; }
+  .control { margin-top: 8px; }
+  input[type=range] { height: 36px; }
+  #hint { margin-top: 5px; }
+  #result { margin-top: 5px; }
+  #lesson { min-height: 16px; margin-top: 4px; }
+  footer { margin-top: 4px; }
+}
 @media (max-width: 600px) {
   main { padding: 27px 16px 18px; }
   header { margin-bottom: 20px; }
