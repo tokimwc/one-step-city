@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>One Step City</title>
   <meta name="description" content="Lower one curb and watch three people find a shorter way through the city.">
-  <meta name="theme-color" content="#FFFFFF">
+  <meta name="theme-color" content="#FFF4DC">
   <meta property="og:title" content="One Step City">
   <meta property="og:description" content="Lower one curb and watch three people find a shorter way through the city.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FFFFFF'/%3E%3Cpath d='M4 22h12V12h12v14H4z' fill='%23101820'/%3E%3Cpath d='M4 19h12v3H4zm12-10h12v3H16z' fill='%23FF5A1F'/%3E%3C/svg%3E">
@@ -14,18 +14,18 @@
 </head>
 <body>
   <main>
-    <header><h1>One Step City</h1><p>One curb. Three journeys.</p></header>
+    <header><h1>One <span>Step</span> City</h1><p>One curb. Three journeys.</p></header>
     <section class="city" aria-label="City crossing">
       <canvas id="city" width="1000" height="760" role="img" aria-label="Three people travel to the bakery, cafe, and shop. Lower the curb to shorten their routes.">Your browser needs Canvas 2D to show this city.</canvas>
 
     </section>
     <section class="control" aria-label="Curb control">
-      <div class="control-heading"><label for="curb">Curb height</label><button id="reset" type="button">Reset</button><output id="height" for="curb" role="generic" aria-live="off">9 <small>cm</small></output></div>
-      <div class="slider-wrap"><p id="hint"><span aria-hidden="true">←</span> Lower the curb</p><input id="curb" type="range" min="0" max="12" step="1" value="9" aria-describedby="hint"><div class="scale" aria-hidden="true"><span>0 cm · level</span><span>12 cm · high</span></div></div>
-      <div class="threshold-ticks" aria-hidden="true"><span class="threshold-tick" data-value="2"><span class="tick-name">wheelchair</span><span class="tick-limit">?</span></span><span class="threshold-tick" data-value="6"><span class="tick-name">stroller</span><span class="tick-limit">?</span></span><span class="threshold-tick" data-value="8"><span class="tick-name">cart</span><span class="tick-limit">?</span></span></div>
+      <div class="control-heading"><div class="control-label"><label for="curb">Curb height</label><p id="hint"><span aria-hidden="true">←</span> Lower the curb</p></div><button id="reset" type="button">Reset</button><output id="height" for="curb" role="generic" aria-live="off">9 <small>cm</small></output></div>
+      <div class="slider-wrap"><input id="curb" type="range" min="0" max="12" step="1" value="9" aria-describedby="hint limits explanation"><div class="scale" aria-hidden="true"><span>0 cm · level</span><span>12 cm · high</span></div><div class="threshold-ticks" aria-hidden="true"><span class="threshold-tick" data-value="2"></span><span class="threshold-tick" data-value="6"></span><span class="threshold-tick" data-value="8"></span></div></div>
+      <div class="limit-chips" id="limits"><span class="limit-chip wheelchair">wheelchair max 2 cm</span><span class="limit-chip stroller">stroller max 6 cm</span><span class="limit-chip cart">cart max 8 cm</span></div>
       <p id="result">0 of 3 arrive on time</p>
-      <p id="discovery">Find each person's limit: 0 of 3 found</p>
-      <p id="lesson">Lower it for the person who needs it most, and everyone gets through. Lowering one curb for the person who needs it most helps everyone.</p>
+      <p id="explanation">A person can cross only if the curb is at or below their max.</p>
+      <p id="lesson">Lowering one curb for the person who needs it most helps everyone.</p>
     </section>
     <p class="scene-caption">Each detour is the same length: 2.5x longer. <br>Routes are authored, not a real accessibility simulation.</p>
     <p id="announcement" class="sr-only" role="status" aria-atomic="true"></p>
