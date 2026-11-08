@@ -30,6 +30,7 @@ let lastResult = '';
 let startedAt = performance.now();
 let viewWidth = 1;
 let viewHeight = 1;
+let announcementTimer = null;
 
 // Both options are authored polylines. Each detour is 1,000 scene units;
 // each straight crossing is 400. This is an illustration, not route finding.
@@ -77,18 +78,19 @@ function pointAlong(route, distance) {
   return route[route.length - 1];
 }
 
-function box(x, y, w, h, color, radius = 0) {
+const INK = '#101820';
+const ORANGE = '#FF5A1F';
+
+function box(x, y, w, h, color) {
   ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, radius);
-  ctx.fill();
+  ctx.fillRect(x, y, w, h);
 }
 
 function line(points, color, width) {
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
+  ctx.lineJoin = 'miter';
+  ctx.lineCap = 'butt';
   ctx.beginPath();
   points.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
   ctx.stroke();
@@ -96,149 +98,221 @@ function line(points, color, width) {
 
 function circle(x, y, r, color) {
   ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
 }
 
-function text(label, x, y, size, color = '#42594b') {
-  ctx.font = `600 ${Math.max(size, 12 / sceneScale)}px system-ui, sans-serif`;
+function text(label, x, y, size, color = INK) {
+  // The tiny margin also covers Canvas font-size rounding at fractional scales.
+  ctx.font = '700 ' + Math.max(size, 12.01 / sceneScale) + 'px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillStyle = color;
   ctx.fillText(label, x, y);
 }
 
+function routeColor(person) {
+  return {wheelchair:'#164E70', stroller:'#76233F', cart:'#374D1A'}[person.kind];
+}
+
+// Draw in local units, scaled to a 20 CSS-pixel status symbol.
 function statusIcon(x, y, onTime) {
-  circle(x, y, 15, '#f8f0d9');
-  if (onTime) line([[x - 7, y], [x - 2, y + 5], [x + 8, y - 6]], '#31594b', 3);
+  ctx.save(); ctx.translate(x, y); ctx.scale(20 / sceneScale / 20, 20 / sceneScale / 20);
+  box(-10, -10, 20, 20, '#FFFFFF');
+  if (onTime) line([[-8, 0], [-2, 7], [8, -8]], INK, 2);
   else {
-    ctx.strokeStyle = '#665947'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2); ctx.stroke();
-    line([[x, y - 6], [x, y], [x + 5, y + 3]], '#665947', 2);
+    ctx.strokeStyle = INK; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.stroke();
+    line([[0, -5], [0, 0], [5, 3]], INK, 2);
   }
-}
-
-function building(person, state, elapsed) {
-  const x = person.x;
-  box(x - 66, 64, 132, 108, '#f8f0d9', 7);
-  box(x - 72, 54, 144, 25, person.roof, 6);
-  ctx.save();
-  if (state.arrived) { ctx.shadowColor = '#f2bb59'; ctx.shadowBlur = 20; }
-  box(x - 46, 97, 27, 32, state.arrived ? '#ffce76' : '#b5c6ba', 3);
-  box(x + 19, 97, 27, 32, state.arrived ? '#ffce76' : '#b5c6ba', 3);
   ctx.restore();
-  box(x - 12, 122, 24, 50, '#6c7c6d', 3);
-  text(person.destination, x, 37, 23);
-  text(`${state.arrived ? 1 : 0} visitor`, x, 261, 17);
-  if (state.arrived || elapsed >= DEADLINE_MS) statusIcon(x + 58, 157, state.direct);
 }
 
-function tree(x, y) {
-  box(x - 4, y + 10, 8, 27, '#9c8b69', 2);
-  circle(x, y, 26, '#bdcfaa');
-  circle(x - 10, y - 5, 18, '#aec49b');
+function building(person, state) {
+  const x = person.x;
+  box(x - 66, 64, 132, 108, INK);
+  box(x - 62, 68, 124, 100, '#FFFFFF');
+  box(x - 72, 54, 144, 18, INK);
+  box(x - 46, 97, 27, 32, state.arrived ? ORANGE : INK);
+  box(x + 19, 97, 27, 32, state.arrived ? ORANGE : INK);
+  box(x - 12, 122, 24, 50, INK);
 }
 
 function character(person, x, y) {
-  ctx.save();
-  ctx.translate(x, y);
+  ctx.save(); ctx.translate(x, y);
   if (x > 910) ctx.scale(-1, 1);
-  circle(0, 16, 22, '#d1d8c6');
+  circle(0, 16, 22, '#FFFFFF');
   if (person.kind === 'wheelchair') {
-    ctx.strokeStyle = '#344b4d';
-    ctx.lineWidth = 5;
+    ctx.strokeStyle = INK; ctx.lineWidth = 5;
     ctx.beginPath(); ctx.arc(-5, 12, 15, 0, Math.PI * 2); ctx.stroke();
-    line([[-3, -3], [1, 13], [19, 13], [24, 22]], '#344b4d', 5);
-    box(-8, -10, 19, 23, person.color, 6);
-    circle(1, -18, 10, '#bd8864');
+    line([[-3, -3], [1, 13], [19, 13], [24, 22]], INK, 5);
+    box(-8, -10, 19, 23, routeColor(person));
+    circle(1, -18, 10, INK);
   } else {
-    line([[-6, 10], [-10, 26]], '#344b4d', 6);
-    line([[7, 10], [11, 26]], '#344b4d', 6);
-    box(-12, -12, 24, 29, person.color, 8);
-    circle(0, -21, 10, '#bd8864');
+    line([[-6, 10], [-10, 26]], INK, 6);
+    line([[7, 10], [11, 26]], INK, 6);
+    box(-12, -12, 24, 29, routeColor(person));
+    circle(0, -21, 10, INK);
     if (person.kind === 'stroller') {
-      line([[8, 0], [22, -10], [28, 3]], '#344b4d', 4);
-      box(18, -28, 30, 30, '#d49b8e', 12);
-      line([[20, -10], [45, -10]], '#9e5361', 4);
-      circle(23, 5, 5, '#344b4d'); circle(44, 5, 5, '#344b4d');
+      line([[8, 0], [22, -10], [28, 3]], INK, 4);
+      box(18, -28, 30, 30, '#FFFFFF');
+      line([[18, -28], [48, -28], [48, 2], [18, 2], [18, -28]], INK, 4);
+      line([[20, -10], [45, -10]], INK, 4);
+      circle(23, 5, 5, INK); circle(44, 5, 5, INK);
     } else {
-      line([[9, 1], [25, -7], [29, 20], [49, 20]], '#344b4d', 4);
-      box(24, -10, 27, 24, '#b9905c', 2);
-      line([[37, -10], [37, 14]], '#e1c291', 3);
-      circle(29, 24, 5, '#344b4d'); circle(49, 24, 5, '#344b4d');
+      line([[9, 1], [25, -7], [29, 20], [49, 20]], INK, 4);
+      box(24, -10, 27, 24, INK);
+      line([[37, -10], [37, 14]], '#FFFFFF', 3);
+      circle(29, 24, 5, INK); circle(49, 24, 5, INK);
     }
   }
   ctx.restore();
 }
 
-function draw(now) {
-  const elapsed = ((now - startedAt) % LOOP_MS + LOOP_MS) % LOOP_MS;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalAlpha = 1;
-  box(0, 0, canvas.width, canvas.height, '#e9edde');
-  sceneScale = Math.min(viewWidth / 1000, viewHeight / 760);
-  const scale = Math.min(canvas.width / 1000, canvas.height / 760);
-  ctx.setTransform(scale, 0, 0, scale, (canvas.width - 1000 * scale) / 2, (canvas.height - 760 * scale) / 2);
-  box(0, 0, 1000, 760, '#e9edde');
-  box(18, 218, 964, 50, '#dce3d1', 18);
-  box(18, 427, 964, 209, '#dce3d1', 18);
-  box(0, 284, 1000, 125, '#c3cbc1');
-  for (let x = 24; x < 1000; x += 88) box(x, 344, 43, 3, '#e6eadf');
-  box(80, 306, 700, 62, '#e0e5d9');
-  for (let x = 290; x < 710; x += 41) box(x, 296, 22, 85, '#f4f2df');
-  // The two ends are open, giving the authored detours a place to cross.
-  // Raise the top face while keeping the authored crossing in place.
-  const stepHeight = curb * 2.2;
-  const stepTop = 337 - stepHeight;
-  ctx.save();
-  ctx.shadowColor = '#344b4d40'; ctx.shadowBlur = curb ? 10 : 0;
-  ctx.shadowOffsetY = curb ? 5 : 0;
-  box(80, stepTop, 700, stepHeight + 3, '#7d806d', 2);
-  ctx.restore();
-  box(80, stepTop - 7, 700, 8, '#faf6dd', 2);
-  line([[82, stepTop + 2], [778, stepTop + 2]], '#aaab91', 2);
+function labelBand(width, elapsed) {
+  sceneScale = 1;
+  people.forEach((person, i) => {
+    const left = i * width / 3, center = left + width / 6 - 9;
+    const state = journey(person, elapsed);
+    text(person.destination, center, 15, 12);
+    text((state.arrived ? 1 : 0) + ' visitor', center, 33, 12);
+    if (state.arrived || elapsed >= DEADLINE_MS) statusIcon(left + width / 3 - 14, 22, state.direct);
+  });
+  line([[0, 42], [width, 42]], INK, 2);
+}
+
+function curbDetail(x, y, width, height, phone, now) {
+  if (!phone) {
+    desktopCurbDetail(x, y, width, height, now);
+    return;
+  }
+  ctx.save(); ctx.translate(x, y); sceneScale = 1;
+  const floor = height - (phone ? 12 : 90);
+  const step = curb * (phone ? 4 : 8);
+  const edge = phone ? 64 : 78;
+  const right = width - (phone ? 116 : 24);
+  line([[0, 0], [width, 0]], INK, 2);
+  text('Curb detail - enlarged', width / 2, 20, phone ? 12 : 14);
+  if (step > 0) {
+    box(edge, floor - step, right - edge, step, ORANGE);
+    line([[edge, floor], [edge, floor - step], [right, floor - step], [right, floor]], INK, 2);
+    box(edge, floor - step - 5, right - edge, 5, '#FFFFFF');
+    line([[edge, floor - step], [edge, floor - step - 5], [right, floor - step - 5]], INK, 2);
+  }
+  line([[12, floor], [right, floor]], INK, 2);
   if (!hasMovedSlider && !motion.matches) {
-    ctx.save();
-    ctx.globalAlpha = .35 + .4 * (1 + Math.sin(now / 380)) / 2;
-    ctx.strokeStyle = '#a56832'; ctx.lineWidth = 1.5 / sceneScale;
-    ctx.beginPath(); ctx.roundRect(74, stepTop - 13, 712, stepHeight + 23, 6); ctx.stroke();
+    ctx.save(); ctx.globalAlpha = .35 + .4 * (1 + Math.sin(now / 380)) / 2;
+    ctx.strokeStyle = INK; ctx.lineWidth = 1;
+    ctx.strokeRect(edge - 5, floor - step - 10, right - edge + 10, step + 15);
     ctx.restore();
   }
-  text(`${curb} cm`, 140, stepTop - 25, 23, '#596759');
-  tree(155, 143); tree(845, 130); tree(170, 660); tree(840, 660);
-  box(450, 670, 100, 13, '#b69e75', 3);
-  box(460, 684, 7, 14, '#7b806a', 2); box(533, 684, 7, 14, '#7b806a', 2);
-  // A silent canvas bell marks the deadline; no sound or external icons.
-  const rang = elapsed >= DEADLINE_MS;
-  ctx.save(); ctx.translate(500, 641);
-  box(-12, -15, 24, 22, rang ? '#d8a248' : '#9ba78d', 10);
-  line([[-17, 8], [17, 8]], '#596759', 3); circle(0, 13, 3, '#596759');
-  if (rang) { line([[-25, -13], [-30, -20]], '#a87735', 3); line([[25, -13], [30, -20]], '#a87735', 3); }
+  text(curb + ' cm', phone ? width - 56 : width / 2, phone ? floor - 12 : 150, phone ? 36 : 80);
   ctx.restore();
-  text(rang ? 'DEADLINE · 3.5 s' : 'BELL AT 3.5 s', 500, 716, 17);
+}
+
+function desktopCurbDetail(x, y, width, height, now) {
+  ctx.save(); ctx.translate(x, y); sceneScale = 1;
+  text('Curb detail - enlarged', width / 2, 25, 14);
+  // At the target desktop size: 22 px/cm, 264 px at 12 cm,
+  // and a 110 px radius wheel representing 5 cm at the same scale.
+  const pxPerCm = Math.min(22, (width - 38) / 15, (height - 108) / 14);
+  const radius = 5 * pxPerCm;
+  const step = curb * pxPerCm;
+  const groupHeight = Math.max(2 * radius, step + 58);
+  const floor = 44 + (height - 44 + groupHeight) / 2;
+  const edge = width - 110;
+  const right = width - 16;
+  if (step > 0) {
+    box(edge, floor - step, right - edge, step, ORANGE);
+    line([[edge, floor], [edge, floor - step], [right, floor - step], [right, floor]], INK, 2);
+    box(edge, floor - step - 5, right - edge, 5, '#FFFFFF');
+    line([[edge, floor - step], [edge, floor - step - 5], [right, floor - step - 5]], INK, 2);
+  } else {
+    box(edge, floor - 3, right - edge, 3, ORANGE);
+  }
+  line([[12, floor], [right, floor]], INK, 2);
+  text(curb === 0 ? '0 cm - level' : curb + ' cm', (edge + right) / 2,
+    floor - step - 18, curb === 0 ? 18 : 38);
+  if (!hasMovedSlider && !motion.matches) {
+    ctx.save(); ctx.globalAlpha = .35 + .4 * (1 + Math.sin(now / 380)) / 2;
+    ctx.strokeStyle = INK; ctx.lineWidth = 1;
+    ctx.strokeRect(edge - 5, floor - step - 10, right - edge + 10, step + 15);
+    ctx.restore();
+  }
+  const roll = motion.matches ? 0 : Math.min(8, ((now - startedAt + LOOP_MS) % LOOP_MS) / 160);
+  ctx.save(); ctx.translate(16 + radius - 8 + roll, floor - radius);
+  ctx.rotate(roll / radius);
+  ctx.strokeStyle = INK; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.stroke();
+  for (let i = 0; i < 4; i++) {
+    const angle = i * Math.PI / 2;
+    line([[0, 0], [Math.cos(angle) * (radius - 5), Math.sin(angle) * (radius - 5)]], INK, 2);
+  }
+  circle(0, 0, 5, INK);
+  ctx.restore(); ctx.restore();
+}
+
+function draw(now) {
+  // Initial dimensions are placeholders until resize measures the canvas.
+  if (viewWidth <= 1 || viewHeight <= 1) return;
+  const elapsed = ((now - startedAt) % LOOP_MS + LOOP_MS) % LOOP_MS;
+  const phone = window.matchMedia('(max-width: 600px)').matches;
+  const dprX = canvas.width / viewWidth, dprY = canvas.height / viewHeight;
+  ctx.setTransform(dprX, 0, 0, dprY, 0, 0); ctx.globalAlpha = 1;
+  box(0, 0, viewWidth, viewHeight, '#FFFFFF');
+  const mapWidth = phone ? viewWidth : viewWidth - 392;
+  const mapHeight = phone ? 276 : viewHeight - 44;
+  const mapScale = Math.min(mapWidth / 1000, mapHeight / (phone ? 760 : 666));
+  const mapX = (mapWidth - 1000 * mapScale) / 2;
+  const mapY = phone ? 44 + (mapHeight - 760 * mapScale) / 2
+    : 44 + (mapHeight - 666 * mapScale) / 2 - 38 * mapScale;
+  ctx.save(); ctx.translate(mapX, mapY); ctx.scale(mapScale, mapScale);
+  sceneScale = mapScale;
+  box(0, 284, 1000, 125, INK);
+  for (let x = 24; x < 1000; x += 88) box(x, 344, 43, 3, '#FFFFFF');
+  box(80, 296, 700, 85, '#FFFFFF');
+  for (let x = 290; x < 710; x += 41) box(x, 296, 22, 85, INK);
+  const step = curb * 2.2;
+  box(80, 337 - step, 700, step, ORANGE);
+  line([[80, 337 - step], [780, 337 - step]], INK, 3);
+  if (!hasMovedSlider && !motion.matches) {
+    ctx.save(); ctx.globalAlpha = .35 + .4 * (1 + Math.sin(now / 380)) / 2;
+    ctx.strokeStyle = INK; ctx.lineWidth = 1 / sceneScale;
+    ctx.strokeRect(74, 327 - step, 712, step + 16); ctx.restore();
+  }
+  const rang = elapsed >= DEADLINE_MS;
+  box(488, 626, 24, 22, INK);
+  line([[483, 649], [517, 649]], INK, 3); circle(500, 654, 3, INK);
+  if (rang) { line([[475, 628], [470, 621]], INK, 3); line([[525, 628], [530, 621]], INK, 3); }
+  text(rang ? 'DEADLINE · 3.5 s' : 'BELL AT 3.5 s', 500, phone ? 716 : 688, 17);
   const fade = motion.matches ? 1 : Math.min(1, elapsed / 150, (LOOP_MS - elapsed) / 150);
   for (const person of people) {
     const state = journey(person, elapsed);
-    building(person, state, elapsed);
+    building(person, state);
     const route = routeFor(person, curb);
     if (previousCurb !== null) {
-      ctx.save(); ctx.setLineDash([2, 12]); ctx.globalAlpha = .45;
-      // Offset the old trace slightly so identical route sections remain legible.
-      line(routeFor(person, previousCurb).map(([x, y]) => [x - 10, y]), person.color, 4);
+      ctx.save(); ctx.setLineDash([2, 12]); ctx.globalAlpha = .55;
+      line(routeFor(person, previousCurb).map(([x, y]) => [x - 10, y]), routeColor(person), 4);
       ctx.restore();
     }
-    line(route, person.color, 6);
-    circle(person.x, 580, 7, person.color);
+    line(route, '#FFFFFF', 11);
+    line(route, routeColor(person), 6);
+    circle(person.x, 580, 7, routeColor(person));
     const [x, y] = state.point;
     ctx.save(); ctx.globalAlpha = fade;
     character(person, x + (state.blocked && !motion.matches ? Math.sin(elapsed / 35) * 3 : 0), y);
     ctx.restore();
     if (state.blocked) {
-      line([[x + 32, y - 40], [x + 44, y - 28]], '#794b36', 4);
-      line([[x + 44, y - 40], [x + 32, y - 28]], '#794b36', 4);
-      // Stagger the middle label to leave room for the larger phone text.
-      text('BLOCKED', x, person.kind === 'stroller' ? 490 : 435, 15, '#794b36');
+      line([[x + 32, y - 40], [x + 44, y - 28]], INK, 4);
+      line([[x + 44, y - 40], [x + 32, y - 28]], INK, 4);
+      text('BLOCKED', x, person.kind === 'stroller' ? 490 : 435, 15);
     }
+  }
+  ctx.restore(); sceneScale = 1;
+  labelBand(mapWidth, elapsed);
+  curbDetail(phone ? 0 : mapWidth + 24, phone ? 328 : 0,
+    phone ? viewWidth : 368, phone ? 104 : viewHeight, phone, now);
+  if (!phone) {
+    line([[0, 42], [viewWidth, 42]], INK, 2);
+    line([[mapWidth + 12, 0], [mapWidth + 12, viewHeight]], INK, 2);
   }
   const onTime = people.filter(person => curb <= person.threshold && journey(person, elapsed).arrived).length;
   const message = `${onTime} of 3 arrived on time`;
@@ -246,12 +320,37 @@ function draw(now) {
   lesson.style.visibility = curb <= 2 && onTime === 3 ? 'visible' : 'hidden';
 }
 
-function restart() {
+function updateAccessibility(announce) {
+  const names = ['Wheelchair user', 'Stroller user', 'Cart user'];
+  const finalCount = people.filter(person => curb <= person.threshold).length;
+  const outcomes = people.map((person, i) => names[i] + ' to ' + person.destination.toLowerCase() +
+    (curb <= person.threshold ? ': direct crossing, arrives on time.' : ': blocked at the curb, takes a detour and arrives late.')).join(' ');
+  const summary = 'Curb ' + curb + ' cm: ' + finalCount + ' of 3 on time. ' + outcomes;
+  canvas.setAttribute('aria-label', 'Top-down city and enlarged curb cross-section. ' + summary);
+  if (announce) {
+    clearTimeout(announcementTimer);
+    announcementTimer = setTimeout(() => {
+      document.getElementById('announcement').textContent = summary;
+      announcementTimer = null;
+    }, 400);
+  }
+}
+
+function positionHint() {
+  const width = slider.getBoundingClientRect().width;
+  const thumb = 16 + (width - 32) * curb / 12;
+  const hint = document.getElementById('hint');
+  hint.style.left = Math.max(0, Math.min(width - hint.offsetWidth, thumb - hint.offsetWidth)) + 'px';
+}
+
+function restart(announce = false) {
   const next = Number(slider.value);
   if (next !== curb) previousCurb = curb;
   curb = next;
   heightOutput.innerHTML = `${curb} <small>cm</small>`;
   slider.setAttribute('aria-valuetext', `${curb} centimeters`);
+  positionHint();
+  updateAccessibility(announce);
   startedAt = performance.now();
   draw(startedAt);
 }
@@ -263,6 +362,7 @@ function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = Math.max(1, Math.round(viewWidth * dpr));
   canvas.height = Math.max(1, Math.round(viewHeight * dpr));
+  positionHint();
   draw(performance.now());
 }
 
@@ -274,9 +374,9 @@ function frame(now) {
 slider.addEventListener('input', () => {
   hasMovedSlider = true;
   document.getElementById('hint').classList.add('settled');
-  restart();
+  restart(true);
 });
-document.getElementById('reset').addEventListener('click', () => { slider.value = '9'; restart(); });
+document.getElementById('reset').addEventListener('click', () => { slider.value = '9'; restart(true); });
 window.addEventListener('resize', resize);
 motion.addEventListener('change', () => draw(performance.now()));
 restart();
