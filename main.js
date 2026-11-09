@@ -28,7 +28,6 @@ let previousCurb = null;
 let hasMovedSlider = false;
 let sceneScale = 1;
 let startedAt = performance.now();
-let phoneDetailScale = 5.5;
 let viewWidth = 1;
 let viewHeight = 1;
 let announcementTimer = null;
@@ -378,17 +377,6 @@ function desktopCurbDetail(x, y, width, height, now) {
 
 // A compact projection changes only drawing coordinates, never authored journeys.
 function phoneLayout() {
-  const compact=95+332*Math.min((viewWidth-44)/1000,.6)+48;
-  if(viewHeight>compact+1){
-    const scale=(viewWidth-44)/1000,left=22,top=16;
-    const buildingBottom=top+148*scale+5;
-    const roadTop=buildingBottom+16;
-    const bell=viewHeight-20;
-    const home=bell-Math.max(36,55*scale);
-    const roadBottom=home-Math.max(26,35*scale);
-    const project=y=>y<=180?top+(y-20)*scale:y<210?top+160*scale+(y-180)/30*(roadTop-top-160*scale):y<=337?roadTop+(y-210)/127*(roadBottom-roadTop):roadBottom+(y-337)/243*(home-roadBottom);
-    return {scale,left,top,roadTop,roadBottom,home,bell,project,expanded:true};
-  }
   const scale=Math.min((viewWidth-44)/1000,(viewHeight-95)/332);
   const left=(viewWidth-1000*scale)/2;
   const buildingBottom=18+148*scale+5;
@@ -440,7 +428,7 @@ function drawPhone(now,elapsed) {
     const [px,py]=state.point,bump=state.direct?crossingBump(elapsed):{lift:0,angle:0};
     ctx.save();ctx.globalAlpha=motion.matches?1:Math.min(1,elapsed/150,(LOOP_MS-elapsed)/150);
     ctx.translate(x(px)+(state.blocked&&!motion.matches?Math.sin(elapsed/35)*3:0),y(py)-bump.lift-walkingBob(state,elapsed));ctx.rotate(bump.angle);
-    const spriteScale=l.expanded?Math.max(.28,Math.min(.43,s*1.4)):s*Math.max(1,28/(100*s));ctx.scale(spriteScale,spriteScale);sceneScale=spriteScale;if(px>910)ctx.scale(-1,1);character(person,0,0,state);
+    const spriteScale=s*Math.max(1,28/(100*s));ctx.scale(spriteScale,spriteScale);sceneScale=spriteScale;if(px>910)ctx.scale(-1,1);character(person,0,0,state);
     if(!state.direct&&!state.blocked&&elapsed>=APPROACH_MS+PAUSE_MS&&!state.arrived){line([[-20,-38],[-24,-46]],INK,2/sceneScale);line([[-30,-32],[-37,-36]],INK,2/sceneScale);}
     ctx.restore();sceneScale=1;
     if(state.blocked)bonk(x(px),y(py),elapsed);
@@ -452,7 +440,7 @@ function drawPhone(now,elapsed) {
   text('3.5 s',viewWidth/2+12,bellY+3,12.01);
   ctx.save();ctx.beginPath();ctx.rect(16,16,viewWidth-32,viewHeight-32);ctx.clip();confetti(elapsed,viewWidth,viewHeight);ctx.restore();
   document.querySelectorAll('.phone-band > div').forEach((e,i)=>{const p=people[i],state=journey(p,elapsed);e.style.color=routeColor(p);e.querySelector('span').textContent=state.direct?'straight':'2.5x longer';const mark=e.querySelector('i');const nextMark=state.arrived||elapsed>=DEADLINE_MS?(state.direct?'check':'clock'):'';if(mark.dataset.mark!==nextMark){mark.dataset.mark=nextMark;mark.innerHTML=nextMark?'<svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'+(nextMark==='check'?'<path d="M2 10l5 7L18 2"/>':'<circle cx="10" cy="10" r="8"/><path d="M10 4v6l5 3"/>')+'</svg>':'';}});
-  const detail=document.querySelector('.phone-detail');detail.querySelector('strong').textContent=curb+' cm';detail.querySelector('.detail-step').style.height=(curb===0?2:curb*phoneDetailScale)+'px';detail.querySelector('.detail-step').classList.toggle('level',curb===0);
+  const detail=document.querySelector('.phone-detail');detail.querySelector('strong').textContent=curb+' cm';detail.querySelector('.detail-step').style.height=(curb===0?2:curb*5.5)+'px';detail.querySelector('.detail-step').classList.toggle('level',curb===0);
   const onTime = people.filter(person => curb <= person.threshold && journey(person, elapsed).arrived).length;
   lesson.style.visibility = curb <= 2 && onTime === 3 ? 'visible' : 'hidden';
 }
@@ -597,7 +585,6 @@ function resize() {
   if(window.innerWidth<900){
     const guide=document.querySelector('.phone-guide'),detail=document.querySelector('.phone-detail');
     const viewport=Math.min(window.innerHeight,window.visualViewport?.height||window.innerHeight);
-    detail.style.setProperty('--detail-height','80px');detail.style.setProperty('--wheel-size','48px');phoneDetailScale=5.5;
     const current=canvas.getBoundingClientRect().height;
     const width=canvas.getBoundingClientRect().width,s=Math.min((width-44)/1000,.6);
     const preferred=95+332*s+48;
@@ -610,15 +597,7 @@ function resize() {
     if(moveCaption&&!after){result.after(guide);guide.classList.add('after-result');}
     else if(!moveCaption&&after){detail.before(guide);guide.classList.remove('after-result');}
     const available=viewport-12-budget();
-    const compactHeight=Math.max(minimum,Math.min(430,preferred,available));
-    // Reserve all supporting text before giving spare height to the illustration.
-    const pageBudget=document.querySelector('main').getBoundingClientRect().bottom+window.scrollY-current;
-    const spare=Math.max(0,viewport-8-pageBudget-compactHeight);
-    const detailGrowth=Math.min(70,spare*.3);
-    detail.style.setProperty('--detail-height',(80+detailGrowth)+'px');
-    detail.style.setProperty('--wheel-size',(48+32*detailGrowth/70)+'px');
-    phoneDetailScale=5.5+4.5*detailGrowth/70;
-    canvas.style.height=Math.max(compactHeight,Math.min(width*1.2,compactHeight+spare-detailGrowth))+'px';
+    canvas.style.height=Math.max(minimum,Math.min(430,preferred,available))+'px';
   } else {
   const current=canvas.getBoundingClientRect().height;
   const other=document.querySelector('main').getBoundingClientRect().height-current;
