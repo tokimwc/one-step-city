@@ -1,7 +1,8 @@
 'use strict';
 
 const canvas = document.getElementById('city');
-const ctx = canvas.getContext('2d');
+let ctx = canvas.getContext('2d');
+const characterSprites = new Map();
 const slider = document.getElementById('curb');
 const heightOutput = document.getElementById('height');
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -158,7 +159,30 @@ function building(person, state) {
   ctx.restore();
 }
 
-function character(person, x, y, state = {direct:true, blocked:false}) {
+// Cache the complete sprite, then dilate only its alpha silhouette by 2 CSS px.
+function character(person,x,y,state={direct:true,blocked:false}) {
+  const target=ctx,t=target.getTransform(),ratio=canvas.width/viewWidth;
+  const scale=Math.hypot(t.a,t.b)/ratio;
+  const key=[person.kind,state.direct,state.blocked,scale.toFixed(6),sceneScale.toFixed(6),ratio].join(':');
+  let sprite=characterSprites.get(key);
+  if(!sprite){
+    const pad=6/scale,left=-40-pad,top=-65-pad;
+    const ink=document.createElement('canvas');ink.width=Math.ceil((130+2*pad)*scale*ratio);ink.height=Math.ceil((115+2*pad)*scale*ratio);
+    const brush=ink.getContext('2d');brush.setTransform(scale*ratio,0,0,scale*ratio,-left*scale*ratio,-top*scale*ratio);
+    try{ctx=brush;characterInk(person,0,0,state);}finally{ctx=target;}
+    const mask=document.createElement('canvas');mask.width=ink.width;mask.height=ink.height;
+    const paint=mask.getContext('2d');paint.drawImage(ink,0,0);paint.globalCompositeOperation='source-in';paint.fillStyle=CREAM;paint.fillRect(0,0,mask.width,mask.height);
+    const border=Math.ceil(2*ratio),outlined=document.createElement('canvas');outlined.width=ink.width+2*border;outlined.height=ink.height+2*border;
+    const outline=outlined.getContext('2d');for(let i=0;i<24;i++){const angle=i*Math.PI/12;outline.drawImage(mask,border+2*ratio*Math.cos(angle),border+2*ratio*Math.sin(angle));}outline.drawImage(ink,border,border);
+    sprite={ink,outlined,left:left-border/(scale*ratio),top:top-border/(scale*ratio),width:outlined.width/(scale*ratio),height:outlined.height/(scale*ratio)};
+    if(characterSprites.size>=48)characterSprites.delete(characterSprites.keys().next().value);
+    characterSprites.set(key,sprite);
+  }
+  target.save();target.translate(x,y);
+  target.drawImage(sprite.outlined,sprite.left,sprite.top,sprite.width,sprite.height);target.restore();
+}
+
+function characterInk(person, x, y, state = {direct:true, blocked:false}) {
   ctx.save(); ctx.translate(x, y); ctx.scale(1.475, 1.475);
   const color = routeColor(person);
   ctx.lineWidth = 2 / sceneScale; ctx.strokeStyle = INK;
@@ -352,13 +376,13 @@ function desktopCurbDetail(x, y, width, height, now) {
 
 // A compact projection changes only drawing coordinates, never authored journeys.
 function phoneLayout() {
-  const scale=Math.min((viewWidth-44)/1000,(viewHeight-103)/332);
+  const scale=Math.min((viewWidth-44)/1000,(viewHeight-95)/332);
   const left=(viewWidth-1000*scale)/2;
   const buildingBottom=18+148*scale+5;
   const roadTop=buildingBottom+16,roadHeight=127*scale;
   const roadBottom=roadTop+roadHeight;
   const home=roadBottom+16+7*scale;
-  const bell=home+50*scale+25;
+  const bell=home+50*scale+17;
   const needed=bell+7+16;
   const extra=Math.max(0,viewHeight-needed);
   const top=18+extra/2;
@@ -411,7 +435,7 @@ function drawPhone(now,elapsed) {
   text('3.5 s',viewWidth/2+12,bellY+3,12.01);
   ctx.save();ctx.beginPath();ctx.rect(16,16,viewWidth-32,viewHeight-32);ctx.clip();confetti(elapsed,viewWidth,viewHeight);ctx.restore();
   document.querySelectorAll('.phone-band > div').forEach((e,i)=>{const p=people[i],state=journey(p,elapsed);e.style.color=routeColor(p);e.querySelector('span').textContent=state.direct?'straight':'2.5x longer';const mark=e.querySelector('i');const nextMark=state.arrived||elapsed>=DEADLINE_MS?(state.direct?'check':'clock'):'';if(mark.dataset.mark!==nextMark){mark.dataset.mark=nextMark;mark.innerHTML=nextMark?'<svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'+(nextMark==='check'?'<path d="M2 10l5 7L18 2"/>':'<circle cx="10" cy="10" r="8"/><path d="M10 4v6l5 3"/>')+'</svg>':'';}});
-  const detail=document.querySelector('.phone-detail');detail.querySelector('strong').textContent=curb+' cm';detail.querySelector('.detail-step').style.height=Math.max(3,curb*1.8)+'px';
+  const detail=document.querySelector('.phone-detail');detail.querySelector('strong').textContent=curb+' cm';detail.querySelector('.detail-step').style.height=(curb===0?2:curb*2.5)+'px';detail.querySelector('.detail-step').classList.toggle('level',curb===0);
   const onTime = people.filter(person => curb <= person.threshold && journey(person, elapsed).arrived).length;
   lesson.style.visibility = curb <= 2 && onTime === 3 ? 'visible' : 'hidden';
 }
@@ -550,11 +574,19 @@ function restart(announce = false) {
 function resize() {
   // Measure wrapping HTML first; spend only the remaining viewport on the scene.
   if(window.innerWidth<900){
-    canvas.style.height='200px';
-    const required=document.getElementById('result').getBoundingClientRect().bottom;
-    const available=window.innerHeight-required+200-4;
+    const guide=document.querySelector('.phone-guide'),detail=document.querySelector('.phone-detail');
+    const viewport=Math.min(window.innerHeight,window.visualViewport?.height||window.innerHeight);
+    const current=canvas.getBoundingClientRect().height;
     const width=canvas.getBoundingClientRect().width,s=Math.min((width-44)/1000,.6);
-    const minimum=18+148*s+5+16+127*s+16+7*s+50*s+25+7+16;
+    const minimum=18+148*s+5+16+127*s+16+7*s+50*s+17+7+16;
+    // Measure without temporarily shrinking the canvas or resetting the scroll position.
+    const budget=()=>result.getBoundingClientRect().bottom+window.scrollY-current;
+    const after=guide.classList.contains('after-result');
+    const aboveBudget=budget()+(after?guide.getBoundingClientRect().height+12:0);
+    const moveCaption=viewport-12-aboveBudget<minimum;
+    if(moveCaption&&!after){result.after(guide);guide.classList.add('after-result');}
+    else if(!moveCaption&&after){detail.before(guide);guide.classList.remove('after-result');}
+    const available=viewport-12-budget();
     canvas.style.height=Math.max(minimum,Math.min(430,minimum+48,available))+'px';
   } else {
   const current=canvas.getBoundingClientRect().height;
@@ -585,6 +617,12 @@ slider.addEventListener('input', () => {
 document.getElementById('reset').addEventListener('click', () => { slider.value='9'; restart(true); });
 
 window.addEventListener('resize', resize);
+window.visualViewport?.addEventListener('resize',()=>{if(window.innerWidth<900)resize();});
+window.addEventListener('load',()=>{if(window.innerWidth<900)resize();});
+// Rebudget after wrapping or font metrics change, without relying on an input event.
+let phoneResizeTimer=null;
+const phoneLayoutObserver=new ResizeObserver(()=>{clearTimeout(phoneResizeTimer);phoneResizeTimer=setTimeout(()=>{if(window.innerWidth<900)resize();},0);});
+for(const e of document.querySelectorAll('header,.phone-band,.control-heading,.limit-chips'))phoneLayoutObserver.observe(e);
 motion.addEventListener('change', () => draw(performance.now()));
 restart();
 resize();

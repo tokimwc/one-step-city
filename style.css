@@ -108,3 +108,28 @@ button:focus-visible,input:focus-visible { outline:3px solid #1764B1; outline-of
  .scene-caption { margin-top:8px; }
 }
 @media(max-width:899px) { main { width:min(1184px,calc(100% - 20px)); } }
+
+@media(max-width:899px) {
+ main { width:min(1184px,calc(100% - 32px)); }
+ .phone-guide { margin-top:12px; }
+ .phone-detail { height:54px; justify-content:center; align-items:flex-end; }
+ .detail-wheel { width:25px; height:25px; border-width:2px; }
+ .phone-detail span { align-self:center; }
+ .detail-step { flex:none; min-width:20px; width:20px; background:repeating-linear-gradient(90deg,#FF5A4E 0 5px,#FFD23F 5px 10px); }
+ .detail-step.level { border:0; background:#FF5A4E; }
+ .phone-detail strong { line-height:28px; }
+ input[type=range] { width:calc(100% - 8px); margin:0 4px; }
+ .threshold-ticks { top:56px; left:4px; width:calc(100% - 8px); }
+ .scale { padding:32px 4px 0; }
+ .scene-caption { padding-bottom:12px; overflow-wrap:break-word; }
+}
+
+@media(max-width:899px) { .slider-wrap { margin-right:88px; } }
+
+@media(max-width:899px) { .control-heading label { position:relative; top:-4px; } }
+
+@media(max-width:899px) {
+ .phone-band > div { min-height:36px; }
+ .phone-band span { min-height:20px; }
+ .phone-guide.after-result { margin:8px 0 0; }
+}
