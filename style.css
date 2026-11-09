@@ -156,3 +156,8 @@ button:focus-visible,input:focus-visible { outline:3px solid #1764B1; outline-of
  .control { width:calc(100vw - 32px); max-width:none; left:50%; transform:translateX(-50%); margin-left:0; }
 }
 @media(max-width:899px) and (max-height:600px) { .phone-band { padding-top:6px; padding-bottom:6px; } }
+
+@media(max-width:899px) {
+ .phone-detail { height:var(--detail-height,80px); grid-template-rows:calc(var(--detail-height,80px) - 12px); }
+ .detail-wheel { width:var(--wheel-size,48px); height:var(--wheel-size,48px); }
+}
