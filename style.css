@@ -133,3 +133,26 @@ button:focus-visible,input:focus-visible { outline:3px solid #1764B1; outline-of
  .phone-band span { min-height:20px; }
  .phone-guide.after-result { margin:8px 0 0; }
 }
+
+@media(max-width:899px) {
+ .phone-detail { display:grid; grid-template-columns:112px 30px auto; grid-template-rows:68px; height:80px; padding:6px 12px; gap:0 12px; justify-content:center; }
+ .detail-wheel { width:48px; height:48px; border-width:3px; grid-column:1; grid-row:1; justify-self:center; align-self:end; }
+ .phone-detail span { position:static; width:112px; text-align:center; grid-column:1; grid-row:1; align-self:start; line-height:14px; }
+ .detail-step { width:30px; min-width:30px; grid-column:2; grid-row:1; align-self:end; }
+ .phone-detail strong { grid-column:3; grid-row:1; align-self:center; font-size:28px; line-height:32px; }
+ .control-heading { height:44px; }
+ .control-label { position:static; width:auto; text-align:left; }
+ .control-heading label { top:0; white-space:nowrap; }
+ #height { display:none; }
+ #reset { position:static; margin-left:auto; }
+ .slider-wrap { margin:0; height:70px; padding:0; }
+ input[type=range] { position:relative; height:44px; z-index:1; }
+ input[type=range]::-webkit-slider-thumb { margin-top:-20px; }
+ input[type=range]::-moz-range-thumb { transform:none; }
+ .threshold-ticks { top:30px; height:6px; }
+ .threshold-tick { height:6px; width:4px; }
+ .threshold-tick::before { content:''; position:absolute; left:50%; top:-5px; width:1px; height:5px; background:currentColor; transform:translateX(-50%); }
+ .scale { position:absolute; top:54px; left:0; right:0; padding:0 4px; }
+ .control { width:calc(100vw - 32px); max-width:none; left:50%; transform:translateX(-50%); margin-left:0; }
+}
+@media(max-width:899px) and (max-height:600px) { .phone-band { padding-top:6px; padding-bottom:6px; } }

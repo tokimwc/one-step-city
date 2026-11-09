@@ -159,7 +159,7 @@ function building(person, state) {
   ctx.restore();
 }
 
-// Cache the complete sprite, then dilate only its alpha silhouette by 2 CSS px.
+// Cache the complete sprite, then dilate only its alpha silhouette by 3 CSS px.
 function character(person,x,y,state={direct:true,blocked:false}) {
   const target=ctx,t=target.getTransform(),ratio=canvas.width/viewWidth;
   const scale=Math.hypot(t.a,t.b)/ratio;
@@ -172,8 +172,8 @@ function character(person,x,y,state={direct:true,blocked:false}) {
     try{ctx=brush;characterInk(person,0,0,state);}finally{ctx=target;}
     const mask=document.createElement('canvas');mask.width=ink.width;mask.height=ink.height;
     const paint=mask.getContext('2d');paint.drawImage(ink,0,0);paint.globalCompositeOperation='source-in';paint.fillStyle=CREAM;paint.fillRect(0,0,mask.width,mask.height);
-    const border=Math.ceil(2*ratio),outlined=document.createElement('canvas');outlined.width=ink.width+2*border;outlined.height=ink.height+2*border;
-    const outline=outlined.getContext('2d');for(let i=0;i<24;i++){const angle=i*Math.PI/12;outline.drawImage(mask,border+2*ratio*Math.cos(angle),border+2*ratio*Math.sin(angle));}outline.drawImage(ink,border,border);
+    const border=Math.ceil(3*ratio),outlined=document.createElement('canvas');outlined.width=ink.width+2*border;outlined.height=ink.height+2*border;
+    const outline=outlined.getContext('2d');for(let i=0;i<24;i++){const angle=i*Math.PI/12;outline.drawImage(mask,border+3*ratio*Math.cos(angle),border+3*ratio*Math.sin(angle));}outline.drawImage(ink,border,border);
     sprite={ink,outlined,left:left-border/(scale*ratio),top:top-border/(scale*ratio),width:outlined.width/(scale*ratio),height:outlined.height/(scale*ratio)};
     if(characterSprites.size>=48)characterSprites.delete(characterSprites.keys().next().value);
     characterSprites.set(key,sprite);
@@ -184,11 +184,11 @@ function character(person,x,y,state={direct:true,blocked:false}) {
 
 function characterInk(person, x, y, state = {direct:true, blocked:false}) {
   ctx.save(); ctx.translate(x, y); ctx.scale(1.475, 1.475);
-  const color = routeColor(person);
+  const color = {wheelchair:'#4FB3FF',stroller:'#FF6B6B',cart:'#3DDBB2'}[person.kind];
   ctx.lineWidth = 2 / sceneScale; ctx.strokeStyle = INK;
   const disk = (cx, cy, r, fill) => { circle(cx,cy,r,fill); ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke(); };
   if (person.kind === 'wheelchair') {
-    disk(-6, 14, 17, SKY);
+    disk(-6, 14, 17, color);
     line([[-6, 14], [10, 14], [20, 26]], INK, 4);
     shape(-9,-10,19,23,color,false,4);
   } else {
@@ -196,7 +196,7 @@ function characterInk(person, x, y, state = {direct:true, blocked:false}) {
     shape(-11,-12,23,27,color,false,4);
     if (person.kind === 'stroller') {
       line([[8, 0], [18, -10], [24, -10]], INK, 5);
-      ctx.fillStyle = ORANGE;ctx.strokeStyle=INK;ctx.lineWidth=2/sceneScale;
+      ctx.fillStyle = color;ctx.strokeStyle=INK;ctx.lineWidth=2/sceneScale;
       ctx.beginPath();ctx.arc(38,-12,20,Math.PI,0);ctx.closePath();ctx.fill();ctx.stroke();
       shape(19,-9,38,16,CREAM,false,7);
       disk(25,14,5,INK);disk(50,14,5,INK);
@@ -207,6 +207,7 @@ function characterInk(person, x, y, state = {direct:true, blocked:false}) {
       disk(24,27,5,INK);disk(49,27,5,INK);
     }
   }
+  line([[-6,2],[6,2]],INK,2/sceneScale);
   disk(0,-25,12,CREAM);
   circle(-4,-27,1.8,INK);circle(4,-27,1.8,INK);
   ctx.lineWidth=1.2/sceneScale;ctx.beginPath();
@@ -415,11 +416,15 @@ function drawPhone(now,elapsed) {
     ctx.beginPath();ctx.moveTo(xx-wedgeWidth/2,edge);ctx.lineTo(xx+wedgeWidth/2,edge-depth/2);
     ctx.lineTo(xx+wedgeWidth/2,edge+depth/2);ctx.lineTo(xx-wedgeWidth/2,edge+depth/2);ctx.closePath();ctx.fill();ctx.stroke();
   }
+  const travelers=[];
   for(const person of people){
     const state=journey(person,elapsed),route=routeFor(person,curb).map(([a,b])=>[x(a),y(b)]);
     if(previousCurb!==null){ctx.save();ctx.setLineDash([2,8]);ctx.globalAlpha=.55;line(routeFor(person,previousCurb).map(([a,b])=>[x(a-10),y(b)]),routeColor(person),2);ctx.restore();}
     line(route,INK,4);line(route,routeColor(person),2);
     circle(x(person.x),l.home,7*s,routeColor(person));
+    travelers.push({person,state});
+  }
+  for(const {person,state} of travelers.sort((a,b)=>b.state.point[0]-a.state.point[0])){
     const [px,py]=state.point,bump=state.direct?crossingBump(elapsed):{lift:0,angle:0};
     ctx.save();ctx.globalAlpha=motion.matches?1:Math.min(1,elapsed/150,(LOOP_MS-elapsed)/150);
     ctx.translate(x(px)+(state.blocked&&!motion.matches?Math.sin(elapsed/35)*3:0),y(py)-bump.lift-walkingBob(state,elapsed));ctx.rotate(bump.angle);
@@ -435,7 +440,7 @@ function drawPhone(now,elapsed) {
   text('3.5 s',viewWidth/2+12,bellY+3,12.01);
   ctx.save();ctx.beginPath();ctx.rect(16,16,viewWidth-32,viewHeight-32);ctx.clip();confetti(elapsed,viewWidth,viewHeight);ctx.restore();
   document.querySelectorAll('.phone-band > div').forEach((e,i)=>{const p=people[i],state=journey(p,elapsed);e.style.color=routeColor(p);e.querySelector('span').textContent=state.direct?'straight':'2.5x longer';const mark=e.querySelector('i');const nextMark=state.arrived||elapsed>=DEADLINE_MS?(state.direct?'check':'clock'):'';if(mark.dataset.mark!==nextMark){mark.dataset.mark=nextMark;mark.innerHTML=nextMark?'<svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'+(nextMark==='check'?'<path d="M2 10l5 7L18 2"/>':'<circle cx="10" cy="10" r="8"/><path d="M10 4v6l5 3"/>')+'</svg>':'';}});
-  const detail=document.querySelector('.phone-detail');detail.querySelector('strong').textContent=curb+' cm';detail.querySelector('.detail-step').style.height=(curb===0?2:curb*2.5)+'px';detail.querySelector('.detail-step').classList.toggle('level',curb===0);
+  const detail=document.querySelector('.phone-detail');detail.querySelector('strong').textContent=curb+' cm';detail.querySelector('.detail-step').style.height=(curb===0?2:curb*5.5)+'px';detail.querySelector('.detail-step').classList.toggle('level',curb===0);
   const onTime = people.filter(person => curb <= person.threshold && journey(person, elapsed).arrived).length;
   lesson.style.visibility = curb <= 2 && onTime === 3 ? 'visible' : 'hidden';
 }
@@ -484,6 +489,7 @@ function draw(now) {
   const rang = elapsed >= DEADLINE_MS;
   text(rang ? '3.5 s · bell!' : 'Bell: 3.5 s', 500, 665, 17);
   const fade = motion.matches ? 1 : Math.min(1, elapsed / 150, (LOOP_MS - elapsed) / 150);
+  const travelers=[];
   for (const person of people) {
     const state = journey(person, elapsed);
     building(person, state);
@@ -496,6 +502,9 @@ function draw(now) {
     line(route, INK, Math.max(10, 6 / mapScale));
     line(route, routeColor(person), Math.max(6, 3 / mapScale));
     circle(person.x, 580, 7, routeColor(person));
+    travelers.push({person,state});
+  }
+  for(const {person,state} of travelers.sort((a,b)=>b.state.point[0]-a.state.point[0])){
     const [x, y] = state.point;
     ctx.save(); ctx.globalAlpha = fade;
     const bump = state.direct ? crossingBump(elapsed) : { lift: 0, angle: 0 };
@@ -578,7 +587,8 @@ function resize() {
     const viewport=Math.min(window.innerHeight,window.visualViewport?.height||window.innerHeight);
     const current=canvas.getBoundingClientRect().height;
     const width=canvas.getBoundingClientRect().width,s=Math.min((width-44)/1000,.6);
-    const minimum=18+148*s+5+16+127*s+16+7*s+50*s+17+7+16;
+    const preferred=95+332*s+48;
+    const minimum=150;
     // Measure without temporarily shrinking the canvas or resetting the scroll position.
     const budget=()=>result.getBoundingClientRect().bottom+window.scrollY-current;
     const after=guide.classList.contains('after-result');
@@ -587,7 +597,7 @@ function resize() {
     if(moveCaption&&!after){result.after(guide);guide.classList.add('after-result');}
     else if(!moveCaption&&after){detail.before(guide);guide.classList.remove('after-result');}
     const available=viewport-12-budget();
-    canvas.style.height=Math.max(minimum,Math.min(430,minimum+48,available))+'px';
+    canvas.style.height=Math.max(minimum,Math.min(430,preferred,available))+'px';
   } else {
   const current=canvas.getBoundingClientRect().height;
   const other=document.querySelector('main').getBoundingClientRect().height-current;
